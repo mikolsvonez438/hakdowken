@@ -380,7 +380,7 @@ function handleSaveResults() {
 
   let content = "Netflix Cookies Checker - Batch Results\n";
   content += "Generated on: " + new Date().toLocaleString() + "\n";
-  content += "Created by: t.me/still_alivenow (Ichigo Kurosaki)\n\n";
+  content += "Created by: Vonez powgie\n\n";
   content += "=".repeat(80) + "\n\n";
 
   let validCount = 0;
