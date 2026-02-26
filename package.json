@@ -2,10 +2,10 @@
   "name": "buneknek",
   "version": "1.0.0",
   "scripts": {
-    "build": "mkdir -p dist && javascript-obfuscator src/app.js --output dist/app.js --config obfuscator.json && javascript-obfuscator src/protect.js --output dist/protect.js --config obfuscator.json",
     "vercel-build": "npm run build"
   },
   "dependencies": {
     "javascript-obfuscator": "^4.1.0"
   }
 }
+
