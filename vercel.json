@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "node inject-env.js",
   "routes": [
     {
       "handle": "filesystem"
