@@ -1,12 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "node inject-env.js",
   "routes": [
-    {
-      "src": "/dist/(.*)",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
     {
       "handle": "filesystem"
     },
