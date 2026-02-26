@@ -64,9 +64,6 @@ function initTabs() {
   });
 }
 
-const API_DOMAIN_ENCODED = __API_DOMAIN__;
-const getDomain = () => atob(API_DOMAIN_ENCODED);
-
 // Initialize the application
 function initApp() {
   updateFileList();
@@ -170,7 +167,7 @@ async function handleGenerate() {
   status.textContent = "Extracting NetflixId...";
 
   try {
-    const response = await fetch(getDomain() + "/api/check", {
+    const response = await fetch("/api/check", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -291,7 +288,7 @@ async function handleProcessBatch() {
   try {
     // Update file list status to processing
     updateFileListProcessing();
-    const response = await fetch(getDomain() + "/api/batch-check", {
+    const response = await fetch("/api/batch-check", {
       method: "POST",
       body: formData,
     });
@@ -684,7 +681,7 @@ function saveTelegramConfig() {
     chat_id: chatIdInput.value,
   };
   localStorage.setItem("telegramConfig", JSON.stringify(config));
-  fetch(getDomain() + "/api/telegram-config", {
+  fetch("/api/telegram-config", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
