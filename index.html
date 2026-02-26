@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Netflix Cookies Checker</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      * {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="logo">Cookie Checker</div>
+        <div class="tagline">Advanced Netflix Token Generator</div>
+      </header>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="single">Single Check</div>
+        <div class="tab" data-tab="batch">Batch Mode</div>
+        <div class="tab" data-tab="about">About</div>
+      </div>
+
+      <div class="tab-content active" id="single-tab">
+        <div class="main-content">
+          <!-- Input Card -->
+          <div class="card">
+            <div class="card-title">
+              <i class="fas fa-terminal"></i>
+              Input Data
+            </div>
+
+            <div class="input-group">
+              <label for="cookie-input">Cookie String</label>
+              <textarea
+                id="cookie-input"
+                placeholder="Paste your Netflix cookies here..."
+              ></textarea>
+            </div>
+
+            <div class="btn-group">
+              <button class="btn" id="load-file-btn">
+                <i class="fas fa-upload"></i> Load File
+              </button>
+              <button class="btn btn-secondary" id="paste-btn">
+                <i class="fas fa-clipboard"></i> Paste
+              </button>
+              <button class="btn btn-secondary" id="clear-btn">
+                <i class="fas fa-trash"></i> Clear
+              </button>
+            </div>
+
+            <div class="mode-toggle">
+              <div class="mode-option active" data-mode="fullinfo">
+                Full Details
+              </div>
+              <div class="mode-option" data-mode="tokenonly">Token Only</div>
+            </div>
+
+            <button
+              class="btn btn-success"
+              id="generate-btn"
+              style="width: 100%"
+            >
+              <i class="fas fa-bolt"></i> Generate Token
+            </button>
+
+            <div class="progress-container">
+              <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+              </div>
+              <div class="status" id="status">System Ready</div>
+            </div>
+          </div>
+
+          <!-- Telegram Card -->
+          <div class="card">
+            <div class="card-title">
+              <i class="fas fa-paper-plane"></i>
+              Auto Sender
+            </div>
+
+            <div class="input-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="telegram-toggle" />
+                <span class="toggle-slider"></span>
+                Enable Telegram
+              </label>
+            </div>
+
+            <div
+              id="telegram-config"
+              class="telegram-config"
+              style="display: none"
+            >
+              <div class="input-group">
+                <label for="bot-token">Bot Token</label>
+                <input
+                  type="text"
+                  id="bot-token"
+                  placeholder="Enter bot token..."
+                />
+              </div>
+
+              <div class="input-group">
+                <label for="chat-id">Chat ID</label>
+                <input
+                  type="text"
+                  id="chat-id"
+                  placeholder="Enter chat ID..."
+                />
+              </div>
+
+              <button
+                class="btn btn-secondary"
+                id="test-telegram-btn"
+                style="width: 100%"
+              >
+                <i class="fas fa-check-circle"></i> Test Connection
+              </button>
+            </div>
+
+            <div class="telegram-status" id="telegram-status">
+              <i class="fas fa-power-off"></i> Telegram Disabled
+            </div>
+          </div>
+
+          <!-- Results Card -->
+          <div class="card">
+            <div class="card-title">
+              <i class="fas fa-chart-line"></i>
+              Output
+            </div>
+
+            <div class="results-container">
+              <div class="results" id="results">
+                <div class="result-item">
+                  <div class="result-title">
+                    <i class="fas fa-info-circle"></i> Waiting for Input
+                  </div>
+                  <div class="result-content">
+                    Process cookies to see results here.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="btn"
+              id="copy-results-btn"
+              style="width: 100%; margin-top: 15px"
+              disabled
+            >
+              <i class="fas fa-copy"></i> Copy Output
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="batch-tab">
+        <div class="main-content">
+          <div class="card">
+            <div class="card-title">
+              <i class="fas fa-layer-group"></i>
+              Batch Processor
+            </div>
+
+            <div class="input-group">
+              <label>Select Files</label>
+              <input
+                type="file"
+                id="batch-files"
+                multiple
+                accept=".txt,.json,.zip"
+              />
+            </div>
+
+            <div class="file-list" id="file-list">
+              <div class="file-item">
+                <span>No files selected</span>
+              </div>
+            </div>
+
+            <div class="mode-toggle">
+              <div class="mode-option active" data-mode="fullinfo">
+                Full Details
+              </div>
+              <div class="mode-option" data-mode="tokenonly">Token Only</div>
+            </div>
+
+            <button
+              class="btn btn-success"
+              id="process-batch-btn"
+              style="width: 100%"
+            >
+              <i class="fas fa-play"></i> Start Processing
+            </button>
+
+            <div class="progress-container">
+              <div class="progress-bar">
+                <div class="progress" id="batch-progress"></div>
+              </div>
+              <div class="status" id="batch-status">Ready</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <i class="fas fa-analytics"></i>
+              Statistics
+            </div>
+
+            <div class="summary">
+              <div class="summary-title">Session Summary</div>
+              <div class="summary-stats">
+                <div class="stat total">
+                  <div class="stat-value" id="total-files">0</div>
+                  <div class="stat-label">Total</div>
+                </div>
+                <div class="stat valid">
+                  <div class="stat-value" id="valid-files">0</div>
+                  <div class="stat-label">Valid</div>
+                </div>
+                <div class="stat invalid">
+                  <div class="stat-value" id="invalid-files">0</div>
+                  <div class="stat-label">Invalid</div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="results-container"
+              style="margin-top: 20px; max-height: 300px"
+            >
+              <div class="file-list" id="batch-results">
+                <div class="file-item">
+                  <span>No results yet</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="btn"
+              id="save-results-btn"
+              style="width: 100%; margin-top: 15px"
+              disabled
+            >
+              <i class="fas fa-download"></i> Export Results
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="about-tab">
+        <div class="card">
+          <div class="card-title">
+            <i class="fas fa-question-circle"></i>
+            System Information
+          </div>
+
+          <p>
+            This tool extracts Netflix authentication data and generates direct
+            access tokens.
+          </p>
+
+          <h3>Capabilities</h3>
+          <ul>
+            <li>Multi-format cookie parsing (JSON, Netscape, Header)</li>
+            <li>Real-time account validation</li>
+            <li>Direct token generation</li>
+            <li>Batch processing with statistics</li>
+            <li>Automated Telegram notifications</li>
+          </ul>
+
+          <h3>Supported Formats</h3>
+          <ul>
+            <li>Raw cookie strings</li>
+            <li>JSON format cookies</li>
+            <li>Netscape format</li>
+            <li>HTTP Header format</li>
+            <li>ZIP archives</li>
+          </ul>
+
+          <h3>Quick Start</h3>
+          <ol>
+            <li>Paste cookie data or load from file</li>
+            <li>Configure Telegram (optional)</li>
+            <li>Select output mode</li>
+            <li>Generate token</li>
+          </ol>
+
+          <div
+            style="
+              margin-top: 30px;
+              padding: 20px;
+              background: rgba(255, 42, 109, 0.1);
+              border-radius: 12px;
+              border-left: 4px solid var(--accent-pink);
+            "
+          >
+            <strong>Warning:</strong> For educational use only.
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>Netflix Cookie Checker &copy; 2026 | Educational Use Only</p>
+        <p>Accenture 🤣</p>
+      </footer>
+    </div>
+
+    <div class="notification" id="notification">Operation completed</div>
+    <script>
+      document.querySelectorAll(".tab-content").forEach((tab, index) => {
+        if (index !== 0) tab.style.display = "none";
+      });
+    </script>
+    <script src="dist/protect.js"></script>
+    <script src="dist/app.js"></script>
+  </body>
+</html>

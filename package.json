@@ -1,0 +1,11 @@
+{
+  "name": "buneknek",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "javascript-obfuscator src/ --output dist/ --config obfuscator.json",
+    "vercel-build": "npm run build"
+  },
+  "dependencies": {
+    "javascript-obfuscator": "^4.1.0"
+  }
+}
