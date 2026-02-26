@@ -1,11 +1,7 @@
 {
   "name": "buneknek",
   "version": "1.0.0",
-  "scripts": {
-    "vercel-build": "npm run build"
-  },
   "dependencies": {
     "javascript-obfuscator": "^4.1.0"
   }
 }
-
