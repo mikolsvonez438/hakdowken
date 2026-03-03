@@ -1,765 +1,1740 @@
-// DOM Elements
-const cookieInput = document.getElementById("cookie-input");
-const loadFileBtn = document.getElementById("load-file-btn");
-const pasteBtn = document.getElementById("paste-btn");
-const clearBtn = document.getElementById("clear-btn");
-const generateBtn = document.getElementById("generate-btn");
-const progress = document.getElementById("progress");
-const status = document.getElementById("status");
-const results = document.getElementById("results");
-const copyResultsBtn = document.getElementById("copy-results-btn");
-const modeOptions = document.querySelectorAll(".mode-option");
-const tabs = document.querySelectorAll(".tab");
-const tabContents = document.querySelectorAll(".tab-content");
-const batchFiles = document.getElementById("batch-files");
-const fileList = document.getElementById("file-list");
-const processBatchBtn = document.getElementById("process-batch-btn");
-const batchProgress = document.getElementById("batch-progress");
-const batchStatus = document.getElementById("batch-status");
-const batchResults = document.getElementById("batch-results");
-const saveResultsBtn = document.getElementById("save-results-btn");
-const totalFiles = document.getElementById("total-files");
-const validFiles = document.getElementById("valid-files");
-const invalidFiles = document.getElementById("invalid-files");
-const notification = document.getElementById("notification");
-
-// Telegram Elements
-const telegramToggle = document.getElementById("telegram-toggle");
-const telegramConfig = document.getElementById("telegram-config");
-const botTokenInput = document.getElementById("bot-token");
-const chatIdInput = document.getElementById("chat-id");
-const testTelegramBtn = document.getElementById("test-telegram-btn");
-const telegramStatus = document.getElementById("telegram-status");
-
-// Global variables
-let currentMode = "fullinfo";
+// Global state
+let currentUser = null;
+let accessToken = null;
+let currentMode = "check_only";
+let batchMode = "check_only";
 let selectedFiles = [];
 let batchResultsData = [];
+let isPremium = false;
+let useStreaming = true;
+let allAccounts = [];
+let filteredAccounts = [];
 
-// Event Listeners
-document.addEventListener("DOMContentLoaded", initApp);
-loadFileBtn.addEventListener("click", handleLoadFile);
-pasteBtn.addEventListener("click", handlePaste);
-clearBtn.addEventListener("click", handleClear);
-generateBtn.addEventListener("click", handleGenerate);
-copyResultsBtn.addEventListener("click", handleCopyResults);
-modeOptions.forEach((option) => {
-  option.addEventListener("click", handleModeChange);
-});
-tabs.forEach((tab) => {
-  tab.addEventListener("click", handleTabChange);
-});
-batchFiles.addEventListener("change", handleBatchFilesChange);
-processBatchBtn.addEventListener("click", handleProcessBatch);
-saveResultsBtn.addEventListener("click", handleSaveResults);
-function initTabs() {
-  tabContents.forEach((content, index) => {
-    if (index === 0) {
-      content.classList.add("active");
-      content.style.display = "block";
-    } else {
-      content.classList.remove("active");
-      content.style.display = "none";
-    }
-  });
-}
+// API Configuration
+const API_URL = "http://prem-eu3.bot-hosting.net:21582";
 
-// Initialize the application
-function initApp() {
-  updateFileList();
-  initTelegram();
+// DOM Elements
+const authModal = document.getElementById("auth-modal");
+const authForm = document.getElementById("auth-form");
+const authTitle = document.getElementById("auth-title");
+const authSubmitText = document.getElementById("auth-submit-text");
+const authSwitchText = document.getElementById("auth-switch-text");
+const authSwitchBtn = document.getElementById("auth-switch-btn");
+const authError = document.getElementById("auth-error");
+const loginPrompt = document.getElementById("login-prompt");
+const mainTabs = document.getElementById("main-tabs");
+const authSection = document.getElementById("auth-section");
+const userBadge = document.getElementById("user-badge");
+const accountsTab = document.getElementById("accounts-tab");
+const tokenModal = document.getElementById("token-modal");
+
+let isLoginMode = true;
+
+// Initialize
+document.addEventListener("DOMContentLoaded", () => {
+  checkSession();
   initTabs();
-}
+  initEventListeners();
+  updateModeUI();
+  updateBatchModeUI();
+});
 
-// Handle mode change (Full Info / Token Only)
-function handleModeChange(e) {
-  const mode = e.target.dataset.mode;
-  currentMode = mode;
+window.addEventListener("beforeunload", () => {
+  document.getElementById("cookie-input").value = "";
+  batchResultsData = [];
+});
 
-  modeOptions.forEach((option) => {
-    option.classList.remove("active");
-  });
-
-  e.target.classList.add("active");
-}
-
-// Handle tab change
-function handleTabChange(e) {
-  const tabId = e.target.dataset.tab;
-
-  // Remove active from all tabs
-  tabs.forEach((tab) => {
-    tab.classList.remove("active");
-  });
-
-  // Hide all tab contents first
-  tabContents.forEach((content) => {
-    content.classList.remove("active");
-    content.style.display = "none"; // Force hide
-  });
-
-  // Activate clicked tab
-  e.target.classList.add("active");
-
-  // Show selected tab content with delay for animation
-  const selectedContent = document.getElementById(`${tabId}-tab`);
-  if (selectedContent) {
-    selectedContent.style.display = "block";
-    // Small delay to allow display:block to apply before adding active class
-    setTimeout(() => {
-      selectedContent.classList.add("active");
-    }, 10);
+function sanitizeDisplay(text) {
+  if (!text) return "N/A";
+  // Mask email: a***@example.com
+  if (text.includes("@")) {
+    const [user, domain] = text.split("@");
+    return user.charAt(0) + "***@" + domain;
   }
+  return text;
 }
 
-// Handle load file
-function handleLoadFile() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".txt,.json,.zip";
+// document.addEventListener("DOMContentLoaded", () => {
+//   // Start with body not logged in
+//   document.body.classList.remove("logged-in");
 
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+//   checkSession();
+//   initTabs();
+//   initEventListeners();
+//   updateModeUI();
+//   updateBatchModeUI();
+// });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      cookieInput.value = e.target.result;
-      showNotification("File loaded successfully");
-    };
-    reader.readAsText(file);
-  };
-
-  input.click();
+// Auth Functions
+function showAuthModal() {
+  authModal.classList.add("show");
+  authError.textContent = "";
 }
 
-// Handle paste from clipboard
-function handlePaste() {
-  navigator.clipboard
-    .readText()
-    .then((text) => {
-      cookieInput.value = text;
-      showNotification("Content pasted from clipboard");
-    })
-    .catch((err) => {
-      showNotification("Failed to read clipboard", true);
-    });
+function hideAuthModal() {
+  authModal.classList.remove("show");
 }
 
-// Handle clear input
-function handleClear() {
-  cookieInput.value = "";
-  showNotification("Input cleared");
+function toggleAuthMode() {
+  isLoginMode = !isLoginMode;
+  authTitle.textContent = isLoginMode ? "Login" : "Sign Up";
+  authSubmitText.textContent = isLoginMode ? "Login" : "Sign Up";
+  authSwitchText.textContent = isLoginMode
+    ? "Don't have an account?"
+    : "Already have an account?";
+  authSwitchBtn.textContent = isLoginMode ? "Sign Up" : "Login";
+  authError.textContent = "";
 }
 
-// Handle generate token
-async function handleGenerate() {
-  const content = cookieInput.value.trim();
-  if (!content) {
-    showNotification("Please enter some content first", true);
-    return;
-  }
+async function handleAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById("auth-email").value;
+  const password = document.getElementById("auth-password").value;
+  const submitBtn = document.getElementById("auth-submit");
 
-  // Disable button and show progress
-  generateBtn.disabled = true;
-  generateBtn.innerHTML = '<div class="spinner"></div> Processing...';
-  progress.style.width = "0%";
-  status.textContent = "Extracting NetflixId...";
+  submitBtn.disabled = true;
+  submitBtn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
   try {
-    const response = await fetch("/api/check", {
+    const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+    const response = await fetch(`${API_URL}${endpoint}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        content: content,
-        mode: currentMode,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      credentials: "include", // IMPORTANT
+      mode: "cors",
     });
 
     const data = await response.json();
 
     if (data.status === "success") {
+      if (isLoginMode) {
+        // Store session
+        accessToken = data.session.access_token;
+        currentUser = data.user;
+        isPremium = data.user.is_premium;
+        localStorage.setItem("access_token", accessToken);
+        localStorage.setItem("refresh_token", data.session.refresh_token);
+        updateUIForUser();
+        hideAuthModal();
+        showNotification("Login successful!");
+      } else {
+        showNotification("Account created! Please login.");
+        toggleAuthMode();
+      }
+    } else {
+      authError.textContent = data.message;
+    }
+  } catch (error) {
+    authError.textContent = "Network error. Please try again.";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
+  }
+}
+
+async function checkSession() {
+  const token = localStorage.getItem("access_token");
+
+  // No token - force show login
+  if (!token) {
+    forceShowLogin();
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      mode: "cors",
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      accessToken = token;
+      currentUser = data.user;
+      isPremium = data.user.is_premium;
+      document.body.classList.add("logged-in");
+      updateUIForUser();
+    } else {
+      // Invalid token - force login
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      forceShowLogin();
+    }
+  } catch (error) {
+    console.error("Session check failed:", error);
+    forceShowLogin();
+  }
+}
+
+function forceShowLogin() {
+  // Ensure body is not logged in state
+  document.body.classList.remove("logged-in");
+
+  // Hide all main content
+  document.getElementById("main-tabs").style.display = "none";
+  document.querySelectorAll(".tab-content").forEach((c) => {
+    c.style.display = "none";
+    c.classList.remove("active");
+  });
+
+  // Show login prompt
+  const loginPrompt = document.getElementById("login-prompt");
+  loginPrompt.style.display = "flex";
+
+  // Auto-show auth modal after short delay
+  setTimeout(() => {
+    showAuthModal();
+  }, 500);
+
+  // Update auth section
+  authSection.innerHTML = `
+        <button class="btn btn-auth" onclick="showAuthModal()">
+            <i class="fas fa-sign-in-alt"></i> Login
+        </button>
+    `;
+
+  document.getElementById("user-status").textContent = "Not logged in";
+}
+
+function updateUIForUser() {
+  if (!currentUser) {
+    forceShowLogin();
+    return;
+  }
+
+  // User is logged in
+  document.body.classList.add("logged-in");
+
+  // Hide login prompt
+  const loginPrompt = document.getElementById("login-prompt");
+  loginPrompt.style.display = "none";
+
+  // Show main content
+  document.getElementById("main-tabs").style.display = "flex";
+  document.getElementById("single-tab").style.display = "block";
+  document.getElementById("single-tab").classList.add("active");
+
+  // Update auth section
+  authSection.innerHTML = `
+        <div class="user-menu">
+            <span class="user-email">${currentUser.email}</span>
+            <button class="btn btn-auth" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    `;
+
+  // Update badge
+  userBadge.textContent = isPremium ? "PREMIUM" : "FREE";
+  userBadge.className = isPremium ? "premium-badge premium" : "premium-badge";
+  userBadge.style.display = "inline-block";
+
+  // Show/hide premium features
+  if (isPremium) {
+    accountsTab.style.display = "flex";
+    document.getElementById("token-mode-btn").classList.remove("disabled");
+    document
+      .getElementById("batch-token-mode-btn")
+      .classList.remove("disabled");
+    document.getElementById("pricing-section").style.display = "none";
+  } else {
+    accountsTab.style.display = "none";
+    document.getElementById("token-mode-btn").classList.add("disabled");
+    document.getElementById("batch-token-mode-btn").classList.add("disabled");
+  }
+
+  document.getElementById("user-status").textContent =
+    `Logged in as ${currentUser.email}`;
+}
+
+async function logout() {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch (e) {
+    console.error("Logout error:", e);
+  }
+
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  currentUser = null;
+  accessToken = null;
+  isPremium = false;
+
+  location.reload();
+}
+
+// API Helper
+async function apiCall(endpoint, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: options.method || "GET",
+    headers: headers,
+    body: options.body,
+    credentials: "include",
+    mode: "cors",
+  });
+
+  if (response.status === 401) {
+    showNotification("Session expired. Please login again.", true);
+    logout();
+    return null;
+  }
+
+  return response.json();
+}
+// Tab Handling
+function initTabs() {
+  const tabs = document.querySelectorAll(".tab");
+  const contents = document.querySelectorAll(".tab-content");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const tabId = tab.dataset.tab;
+
+      console.log("Tab clicked:", tabId); // DEBUG
+
+      // Check auth for protected tabs
+      if (
+        (tabId === "single" || tabId === "batch" || tabId === "accounts") &&
+        !currentUser
+      ) {
+        showAuthModal();
+        return;
+      }
+
+      // Check premium for accounts tab
+      if (tabId === "accounts" && !isPremium) {
+        showNotification("Premium subscription required", true);
+        return;
+      }
+
+      tabs.forEach((t) => t.classList.remove("active"));
+      contents.forEach((c) => {
+        c.classList.remove("active");
+        c.style.display = "none";
+      });
+
+      tab.classList.add("active");
+
+      // Fix: Properly select the content element
+      let selectedContent;
+      if (tabId === "accounts") {
+        selectedContent = document.getElementById("accounts-tab-content");
+      } else {
+        selectedContent = document.getElementById(`${tabId}-tab`);
+      }
+
+      console.log("Selected content:", selectedContent); // DEBUG
+
+      if (selectedContent) {
+        selectedContent.style.display = "block";
+        setTimeout(() => selectedContent.classList.add("active"), 10);
+      }
+
+      // Load accounts if accounts tab
+      if (tabId === "accounts" && isPremium) {
+        console.log("Loading accounts..."); // DEBUG
+        loadAccounts();
+      }
+    });
+  });
+}
+// Mode Switching
+const modeDescriptions = {
+  check_only: {
+    single: "Validates cookie and shows account info only",
+    batch: "Validates all cookies without generating tokens",
+    btnText: "Check Cookie",
+    batchBtnText: "Check Cookies",
+    emptyDesc: "Enter cookie data and click Check Cookie to validate",
+  },
+  generate_token: {
+    single: "Validates cookie and generates access token with device links",
+    batch: "Validates cookies and generates tokens for all valid accounts",
+    btnText: "Generate Token",
+    batchBtnText: "Generate Tokens",
+    emptyDesc: "Enter cookie data and click Generate Token to get access links",
+  },
+};
+
+function setMode(mode) {
+  if (mode === "generate_token" && !isPremium) {
+    showNotification("Upgrade to Premium to generate tokens", true);
+    return;
+  }
+  currentMode = mode;
+  document.querySelectorAll("#mode-switch .mode-option").forEach((opt) => {
+    opt.classList.toggle("active", opt.dataset.mode === mode);
+  });
+  updateModeUI();
+}
+
+function updateModeUI() {
+  const desc = modeDescriptions[currentMode];
+  document.querySelector("#mode-description span").textContent = desc.single;
+  document.getElementById("btn-text").textContent = desc.btnText;
+  document.getElementById("empty-desc").textContent = desc.emptyDesc;
+}
+
+function setBatchMode(mode) {
+  if (mode === "generate_token" && !isPremium) {
+    showNotification("Upgrade to Premium to generate tokens", true);
+    return;
+  }
+  batchMode = mode;
+  document
+    .querySelectorAll("#batch-mode-switch .mode-option")
+    .forEach((opt) => {
+      opt.classList.toggle("active", opt.dataset.mode === mode);
+    });
+  updateBatchModeUI();
+}
+
+function updateBatchModeUI() {
+  const desc = modeDescriptions[batchMode];
+  document.querySelector("#batch-mode-description span").textContent =
+    desc.batch;
+  document.getElementById("batch-btn-text").textContent = desc.batchBtnText;
+}
+
+// Event Listeners
+function initEventListeners() {
+  // Auth
+  authForm.addEventListener("submit", handleAuth);
+
+  // Mode switches
+  document.querySelectorAll("#mode-switch .mode-option").forEach((opt) => {
+    opt.addEventListener("click", () => setMode(opt.dataset.mode));
+  });
+
+  document
+    .querySelectorAll("#batch-mode-switch .mode-option")
+    .forEach((opt) => {
+      opt.addEventListener("click", () => setBatchMode(opt.dataset.mode));
+    });
+
+  // Single check
+  document.getElementById("paste-btn").addEventListener("click", handlePaste);
+  document.getElementById("clear-btn").addEventListener("click", handleClear);
+  document
+    .getElementById("generate-btn")
+    .addEventListener("click", handleGenerate);
+  document
+    .getElementById("copy-results-btn")
+    .addEventListener("click", handleCopyResults);
+
+  // File upload
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () =>
+    dropZone.classList.remove("dragover"),
+  );
+  dropZone.addEventListener("drop", handleFileDrop);
+  fileInput.addEventListener("change", handleFileSelect);
+
+  // Batch
+  const batchDropZone = document.getElementById("batch-drop-zone");
+  const batchFiles = document.getElementById("batch-files");
+
+  batchDropZone.addEventListener("click", () => batchFiles.click());
+  batchDropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    batchDropZone.classList.add("dragover");
+  });
+  batchDropZone.addEventListener("dragleave", () =>
+    batchDropZone.classList.remove("dragover"),
+  );
+  batchDropZone.addEventListener("drop", handleBatchFileDrop);
+  batchFiles.addEventListener("change", handleBatchFilesChange);
+
+  document
+    .getElementById("process-batch-btn")
+    .addEventListener("click", handleProcessBatch);
+  document
+    .getElementById("save-results-btn")
+    .addEventListener("click", handleSaveResults);
+}
+
+// File Handling
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById("drop-zone").classList.remove("dragover");
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) readFile(file);
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById("cookie-input").value = e.target.result;
+    showNotification("File loaded successfully");
+  };
+  reader.readAsText(file);
+}
+
+function handlePaste() {
+  navigator.clipboard
+    .readText()
+    .then((text) => {
+      document.getElementById("cookie-input").value = text;
+      showNotification("Content pasted from clipboard");
+    })
+    .catch(() => showNotification("Failed to read clipboard", true));
+}
+
+function handleClear() {
+  document.getElementById("cookie-input").value = "";
+  showNotification("Input cleared");
+}
+
+// Generate/Check
+async function handleGenerate() {
+  const content = document.getElementById("cookie-input").value.trim();
+  if (!content) {
+    showNotification("Please enter cookie data first", true);
+    return;
+  }
+
+  const btn = document.getElementById("generate-btn");
+  const progress = document.getElementById("progress");
+  const status = document.getElementById("status");
+
+  btn.disabled = true;
+  btn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i><span>Processing...</span>';
+  progress.style.width = "0%";
+  status.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i><span>Processing...</span>';
+
+  try {
+    const data = await apiCall("/api/check", {
+      method: "POST",
+      body: JSON.stringify({ content, mode: currentMode }),
+    });
+
+    if (!data) return;
+
+    if (data.status === "success") {
       progress.style.width = "100%";
-      status.textContent = "Processing complete";
-      displayResults(data);
-      showNotification("Token generated successfully");
+      status.innerHTML =
+        '<i class="fas fa-check-circle"></i><span>Complete</span>';
+
+      if (currentMode === "check_only") {
+        displayCheckOnlyResult(data);
+      } else {
+        displayResults(data);
+      }
+
+      document.getElementById("result-badge").style.display = "block";
+      showNotification(
+        currentMode === "check_only"
+          ? "Cookie validated"
+          : "Token generated successfully",
+      );
     } else {
       progress.style.width = "100%";
-      status.textContent = "Processing failed";
+      status.innerHTML =
+        '<i class="fas fa-times-circle"></i><span>Failed</span>';
       displayError(data.message);
       showNotification(data.message, true);
     }
   } catch (error) {
     progress.style.width = "100%";
-    status.textContent = "Processing failed";
+    status.innerHTML = '<i class="fas fa-times-circle"></i><span>Error</span>';
     displayError("Network error: " + error.message);
-    showNotification("Network error: " + error.message, true);
+    showNotification("Network error", true);
   } finally {
-    generateBtn.disabled = false;
-    generateBtn.innerHTML = '<i class="fas fa-bolt"></i> Generate Token';
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-bolt"></i><span>${modeDescriptions[currentMode].btnText}</span>`;
   }
 }
 
-// Handle copy results
-function handleCopyResults() {
-  const resultsText = results.innerText;
-  navigator.clipboard
-    .writeText(resultsText)
-    .then(() => {
-      showNotification("Results copied to clipboard");
-    })
-    .catch((err) => {
-      showNotification("Failed to copy results", true);
-    });
+// Display Functions
+function displayCheckOnlyResult(data) {
+  const resultData = data.data;
+  const isValid = resultData.is_premium;
+  const storedBadge = resultData.stored_in_db
+    ? '<span class="stored-badge"><i class="fas fa-database"></i> Stored in DB</span>'
+    : "";
+
+  let html = `
+        <div class="result-item">
+            <div class="check-only-result ${isValid ? "valid" : "invalid"}">
+                <div class="status-icon">
+                    <i class="fas fa-${isValid ? "check-circle" : "exclamation-circle"}"></i>
+                </div>
+                <h3>${isValid ? "Valid Premium Account" : "Valid Account"} ${storedBadge}</h3>
+                <p>Cookie is working and account is ${isValid ? "premium" : "standard"}</p>
+                
+                <div class="quick-info">
+                    <div class="quick-info-item">
+                        <div class="quick-info-label">Email</div>
+                        <div class="quick-info-value">${sanitizeDisplay(resultData.email)}</div>
+                    </div>
+                    <div class="quick-info-item">
+                        <div class="quick-info-label">Country</div>
+                        <div class="quick-info-value">${resultData.country}</div>
+                    </div>
+                    <div class="quick-info-item">
+                        <div class="quick-info-label">Plan</div>
+                        <div class="quick-info-value">${resultData.plan}</div>
+                    </div>
+                    <div class="quick-info-item">
+                        <div class="quick-info-label">Type</div>
+                        <div class="quick-info-value" style="color: ${isValid ? "var(--accent-green)" : "var(--accent-orange)"}">
+                            ${resultData.subscription_type}
+                        </div>
+                    </div>
+                </div>
+                ${
+                  !isPremium && isValid
+                    ? `
+                <div class="upgrade-prompt">
+                    <i class="fas fa-crown"></i>
+                    <span>Upgrade to Premium to generate tokens for this account!</span>
+                </div>
+                `
+                    : ""
+                }
+            </div>
+        </div>
+    `;
+
+  document.getElementById("results").innerHTML = html;
+  document.getElementById("copy-results-btn").disabled = false;
 }
 
-// Handle batch files change
+// UPDATED displayResults function
+function displayResults(data) {
+  const resultData = data.data;
+  const expTime = resultData.expires
+    ? new Date(resultData.expires * 1000).toLocaleString()
+    : "Unknown";
+
+  let html = `
+        <div class="result-item">
+            <div class="result-header">
+                <div class="result-badge valid"><i class="fas fa-check"></i> VALID</div>
+                ${resultData.is_premium ? '<div class="result-badge premium"><i class="fas fa-crown"></i> PREMIUM</div>' : ""}
+                <div class="result-badge country"><i class="fas fa-globe"></i> ${resultData.country}</div>
+            </div>
+            
+            <div class="account-info">
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
+                    <span class="info-value">${sanitizeDisplay(resultData.email)}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-globe-americas"></i> Country</span>
+                    <span class="info-value">${resultData.country}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-tag"></i> Plan</span>
+                    <span class="info-value">${resultData.plan}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-gem"></i> Type</span>
+                    <span class="info-value">${resultData.subscription_type}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+  if (resultData.token && resultData.login_urls) {
+    html += `
+            <div class="result-item">
+                <div class="device-links">
+                    <div class="device-links-title">
+                        <i class="fas fa-external-link-alt"></i> Quick Access Links
+                    </div>
+                    
+                    <div class="device-grid">
+                        <div class="device-card phone">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-mobile-alt"></i></div>
+                                <div class="device-name">Mobile / Phone</div>
+                            </div>
+                            <a href="${resultData.login_urls.phone}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on Mobile
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.phone}', 'Mobile link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="device-card tv">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-tv"></i></div>
+                                <div class="device-name">Smart TV</div>
+                            </div>
+                            <a href="${resultData.login_urls.tv}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on TV
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.tv}', 'TV link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="device-card pc">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-laptop"></i></div>
+                                <div class="device-name">PC / Laptop</div>
+                            </div>
+                            <a href="${resultData.login_urls.pc}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on PC
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.pc}', 'PC link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="token-section">
+                    <div class="token-header">
+                        <span class="token-label"><i class="fas fa-key"></i> Token Details</span>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">
+                            <i class="fas fa-clock"></i> Expires: ${expTime}
+                        </span>
+                    </div>
+                    <div class="token-value">${resultData.token}</div>
+                </div>
+            </div>
+        `;
+  }
+
+  document.getElementById("results").innerHTML = html;
+  document.getElementById("copy-results-btn").disabled = false;
+}
+function displayResults(data) {
+  const resultData = data.data;
+  const expTime = resultData.expires
+    ? new Date(resultData.expires * 1000).toLocaleString()
+    : "Unknown";
+
+  let html = `
+        <div class="result-item">
+            <div class="result-header">
+                <div class="result-badge valid"><i class="fas fa-check"></i> VALID</div>
+                ${resultData.is_premium ? '<div class="result-badge premium"><i class="fas fa-crown"></i> PREMIUM</div>' : ""}
+                <div class="result-badge country"><i class="fas fa-globe"></i> ${resultData.country}</div>
+            </div>
+            
+            <div class="account-info">
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
+                    <span class="info-value">${decodeEmail(resultData.email)}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-globe-americas"></i> Country</span>
+                    <span class="info-value">${resultData.country}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-tag"></i> Plan</span>
+                    <span class="info-value">${resultData.plan}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i class="fas fa-gem"></i> Type</span>
+                    <span class="info-value">${resultData.subscription_type}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+  if (resultData.token && resultData.login_urls) {
+    html += `
+            <div class="result-item">
+                <div class="device-links">
+                    <div class="device-links-title">
+                        <i class="fas fa-external-link-alt"></i> Quick Access Links
+                    </div>
+                    
+                    <div class="device-grid">
+                        <div class="device-card phone">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-mobile-alt"></i></div>
+                                <div class="device-name">Mobile / Phone</div>
+                            </div>
+                            <a href="${resultData.login_urls.phone}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on Mobile
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.phone}', 'Mobile link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="device-card tv">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-tv"></i></div>
+                                <div class="device-name">Smart TV</div>
+                            </div>
+                            <a href="${resultData.login_urls.tv}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on TV
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.tv}', 'TV link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="device-card pc">
+                            <div class="device-header">
+                                <div class="device-icon"><i class="fas fa-laptop"></i></div>
+                                <div class="device-name">PC / Laptop</div>
+                            </div>
+                            <a href="${resultData.login_urls.pc}" target="_blank" class="device-link">
+                                <i class="fas fa-link"></i> Open Netflix on PC
+                            </a>
+                            <div class="device-actions">
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.pc}', 'PC link copied!')">
+                                    <i class="fas fa-copy"></i> Copy Link
+                                </button>
+                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+                                    <i class="fas fa-key"></i> Copy Token
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="token-section">
+                    <div class="token-header">
+                        <span class="token-label"><i class="fas fa-key"></i> Token Details</span>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">
+                            <i class="fas fa-clock"></i> Expires: ${expTime}
+                        </span>
+                    </div>
+                    <div class="token-value">${resultData.token}</div>
+                </div>
+            </div>
+        `;
+  }
+
+  document.getElementById("results").innerHTML = html;
+  document.getElementById("copy-results-btn").disabled = false;
+}
+
+function displayError(message) {
+  document.getElementById("results").innerHTML = `
+        <div class="result-item" style="border-left-color: var(--accent-red);">
+            <div class="check-only-result invalid">
+                <div class="status-icon">
+                    <i class="fas fa-times-circle"></i>
+                </div>
+                <h3>Invalid Cookie</h3>
+                <p>${message}</p>
+            </div>
+        </div>
+    `;
+  document.getElementById("copy-results-btn").disabled = false;
+  document.getElementById("result-badge").style.display = "none";
+}
+
+function handleCopyResults() {
+  const text = document.getElementById("results").innerText;
+  copyToClipboard(text, "All results copied!");
+}
+
+// Batch Processing
+function handleBatchFileDrop(e) {
+  e.preventDefault();
+  document.getElementById("batch-drop-zone").classList.remove("dragover");
+  const files = Array.from(e.dataTransfer.files);
+  handleFiles(files);
+}
+
 function handleBatchFilesChange(e) {
-  selectedFiles = Array.from(e.target.files);
+  const files = Array.from(e.target.files);
+  handleFiles(files);
+}
+
+function handleFiles(files) {
+  selectedFiles = files.filter(
+    (f) => f.name.endsWith(".txt") || f.name.endsWith(".zip"),
+  );
   updateFileList();
 }
 
-// Update file list display
 function updateFileList() {
+  const fileList = document.getElementById("file-list");
+  const fileCount = document.getElementById("file-count");
+
   fileList.innerHTML = "";
+  fileCount.textContent = `${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""}`;
 
   if (selectedFiles.length === 0) {
-    fileList.innerHTML =
-      '<div class="file-item"><span>No files selected</span></div>';
+    fileList.innerHTML = `
+            <div class="file-item empty">
+                <i class="fas fa-inbox"></i>
+                <span>No files selected</span>
+            </div>
+        `;
     return;
   }
 
-  selectedFiles.forEach((file, index) => {
-    const fileItem = document.createElement("div");
-    fileItem.className = "file-item";
-    fileItem.innerHTML = `
-            <span>${file.name}</span>
-            <span class="file-status">Pending</span>
+  selectedFiles.forEach((file) => {
+    const item = document.createElement("div");
+    item.className = "file-item";
+    item.innerHTML = `
+            <div class="file-icon"><i class="fas fa-file-alt"></i></div>
+            <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-size">${(file.size / 1024).toFixed(1)} KB</div>
+            </div>
+            <span class="file-status pending">Pending</span>
         `;
-    fileList.appendChild(fileItem);
+    fileList.appendChild(item);
   });
 
-  totalFiles.textContent = selectedFiles.length;
-  validFiles.textContent = "0";
-  invalidFiles.textContent = "0";
+  document.getElementById("total-files").textContent = selectedFiles.length;
+  document.getElementById("valid-files").textContent = "0";
+  document.getElementById("invalid-files").textContent = "0";
 }
 
-// Update file list to show processing status
-function updateFileListProcessing() {
-  fileList.innerHTML = "";
-
-  selectedFiles.forEach((file, index) => {
-    const fileItem = document.createElement("div");
-    fileItem.className = "file-item";
-    fileItem.innerHTML = `
-            <span>${file.name}</span>
-            <span class="file-status processing">Processing...</span>
-        `;
-    fileList.appendChild(fileItem);
-  });
-}
-
-// Handle process batch
 async function handleProcessBatch() {
   if (selectedFiles.length === 0) {
     showNotification("Please select files first", true);
     return;
   }
 
-  // Reset results
   batchResultsData = [];
-  batchResults.innerHTML = "";
-  saveResultsBtn.disabled = true;
+  const batchResults = document.getElementById("batch-results");
+  batchResults.innerHTML = ""; // Clear previous results
 
-  // Disable button and show progress
-  processBatchBtn.disabled = true;
-  processBatchBtn.innerHTML = '<div class="spinner"></div> Processing...';
-  batchProgress.style.width = "0%";
-  batchStatus.textContent = "Processing batch...";
+  const btn = document.getElementById("process-batch-btn");
+  const progress = document.getElementById("batch-progress");
+  const status = document.getElementById("batch-status");
+  const saveBtn = document.getElementById("save-results-btn");
+
+  btn.disabled = true;
+  saveBtn.disabled = true;
+  btn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i><span>Processing...</span>';
+  progress.style.width = "0%";
+  status.textContent = "Starting...";
+
+  // Reset statistics
+  updateStats(selectedFiles.length, 0, 0);
 
   const formData = new FormData();
-  selectedFiles.forEach((file) => {
-    formData.append("files", file);
-  });
-  formData.append("mode", currentMode);
+  selectedFiles.forEach((file) => formData.append("files", file));
+  formData.append("mode", batchMode);
+
+  // Update file list to show processing state
+  updateFileListProcessingState();
 
   try {
-    // Update file list status to processing
-    updateFileListProcessing();
-    const response = await fetch("/api/batch-check", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    if (data.status === "success") {
-      batchResultsData = data.results;
-      displayBatchResults(batchResultsData);
-      batchProgress.style.width = "100%";
-      batchStatus.textContent = "Batch processing complete";
-      saveResultsBtn.disabled = false;
-      showNotification(
-        `Batch processing completed: ${batchResultsData.filter((r) => r.status === "success").length} valid, ${batchResultsData.filter((r) => r.status === "error").length} invalid`,
-      );
+    if (useStreaming && window.EventSource) {
+      // Use streaming for real-time updates
+      await processBatchStreaming(formData, progress, status, btn, saveBtn);
     } else {
-      batchProgress.style.width = "100%";
-      batchStatus.textContent = "Batch processing failed";
-      showNotification(data.message, true);
+      // Fallback to regular fetch
+      await processBatchRegular(formData, progress, status, btn, saveBtn);
     }
   } catch (error) {
-    batchProgress.style.width = "100%";
-    batchStatus.textContent = "Batch processing failed";
-    showNotification("Network error: " + error.message, true);
-  } finally {
-    processBatchBtn.disabled = false;
-    processBatchBtn.innerHTML = '<i class="fas fa-play"></i> Start Processing';
+    console.error("Batch processing error:", error);
+    progress.style.width = "100%";
+    status.textContent = "Failed";
+    showNotification(error.message, true);
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
   }
 }
 
-// Display batch results
-function displayBatchResults(results) {
-  batchResults.innerHTML = "";
+async function processBatchRegular(formData, progress, status, btn, saveBtn) {
+  // Fallback for browsers that don't support streaming
+  progress.style.width = "50%";
+  status.textContent = "Processing...";
+
+  const response = await fetch(`${API_URL}/api/batch-check`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (data.status === "success") {
+    batchResultsData = data.results || [];
+    displayBatchResults(batchResultsData);
+    progress.style.width = "100%";
+
+    const valid = batchResultsData.filter((r) => r.status === "success").length;
+    const invalid = batchResultsData.length - valid;
+    status.textContent = `Complete - ${valid} valid, ${invalid} invalid`;
+    saveBtn.disabled = false;
+
+    showNotification(`Processed: ${valid} valid, ${invalid} invalid`);
+  } else {
+    throw new Error(data.message || "Unknown error");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
+}
+
+function updateFileListProcessingState() {
+  const fileItems = document.querySelectorAll(".file-item");
+  fileItems.forEach((item) => {
+    const statusSpan = item.querySelector(".file-status");
+    if (statusSpan && statusSpan.textContent === "Pending") {
+      statusSpan.className = "file-status processing";
+      statusSpan.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    }
+  });
+}
+
+function updateFileItemStatus(filename, status) {
+  const fileItems = document.querySelectorAll(".file-item");
+  fileItems.forEach((item) => {
+    const nameDiv = item.querySelector(".file-name");
+    if (nameDiv && nameDiv.textContent.includes(filename.substring(0, 30))) {
+      const statusSpan = item.querySelector(".file-status");
+      if (statusSpan) {
+        if (status === "processing") {
+          statusSpan.className = "file-status processing";
+          statusSpan.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+        } else if (status === "valid") {
+          statusSpan.className = "file-status valid";
+          statusSpan.innerHTML = '<i class="fas fa-check"></i> Done';
+        } else if (status === "invalid") {
+          statusSpan.className = "file-status invalid";
+          statusSpan.innerHTML = '<i class="fas fa-times"></i> Failed';
+        }
+      }
+    }
+  });
+}
+
+function addResultToDisplay(result, isValid) {
+  const batchResults = document.getElementById("batch-results");
+
+  // Remove placeholder if exists
+  const placeholder = batchResults.querySelector(".result-placeholder");
+  if (placeholder) placeholder.remove();
+
+  const item = document.createElement("div");
+  item.className = "file-item";
+  item.style.animation = "slideIn 0.3s ease";
+
+  if (isValid) {
+    const data = result;
+    let extraInfo = "";
+
+    if (batchMode === "generate_token" && data.token) {
+      extraInfo = ` | Token: ${data.token.substring(0, 12)}...`;
+    } else if (batchMode === "generate_token" && data.token_error) {
+      extraInfo = " | Token failed";
+    }
+
+    const storedBadge = data.stored_in_db
+      ? '<span class="stored-badge-small"><i class="fas fa-database"></i></span>'
+      : "";
+
+    item.innerHTML = `
+            <div class="file-icon" style="background: rgba(6,255,165,0.1); color: var(--accent-green);">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="file-info">
+                <div class="file-name">${escapeHtml(result.filename)} ${storedBadge}</div>
+                <div class="file-size">${sanitizeDisplay(data.email) || "N/A"} | ${data.country || "N/A"} | ${data.subscription_type || "Unknown"}${extraInfo}</div>
+            </div>
+            <span class="file-status valid">Valid</span>
+        `;
+  } else {
+    item.innerHTML = `
+            <div class="file-icon" style="background: rgba(230,57,70,0.1); color: var(--accent-red);">
+                <i class="fas fa-times"></i>
+            </div>
+            <div class="file-info">
+                <div class="file-name">${escapeHtml(result.filename)}</div>
+                <div class="file-size" style="color: var(--accent-red);">${result.message || "Unknown error"}</div>
+            </div>
+            <span class="file-status invalid">Invalid</span>
+        `;
+  }
+
+  batchResults.appendChild(item);
+  // Auto-scroll to bottom
+  batchResults.scrollTop = batchResults.scrollHeight;
+}
+
+function updateStats(total, valid, invalid) {
+  document.getElementById("total-files").textContent = total;
+  document.getElementById("valid-files").textContent = valid;
+  document.getElementById("invalid-files").textContent = invalid;
+
+  const rate = total > 0 ? ((valid / total) * 100).toFixed(0) : 0;
+  document.getElementById("success-rate").textContent = `${rate}%`;
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Add CSS animation for slide-in effect
+const style = document.createElement("style");
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+`;
+document.head.appendChild(style);
+
+async function processBatchStreaming(formData, progress, status, btn, saveBtn) {
+  const response = await fetch(`${API_URL}/api/batch-check`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "text/event-stream",
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
 
   let validCount = 0;
   let invalidCount = 0;
+  let totalCount = selectedFiles.length;
 
-  results.forEach((result) => {
-    const fileItem = document.createElement("div");
-    fileItem.className = "file-item";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-    if (result.status === "success") {
-      const account = result.account_info;
-      const token = result.token_result;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop(); // Keep incomplete line in buffer
 
-      let statusText = `✅ ${result.filename} | `;
-      statusText += `Status: ${account.ok ? "Valid" : "Invalid"} | `;
-      statusText += `Premium: ${account.premium ? "Yes" : "No"} | `;
-      statusText += `Country: ${account.country}`;
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const data = JSON.parse(line.slice(6));
 
-      if (token.status === "Success") {
-        statusText += ` | Token: ${token.token.substring(0, 15)}...`;
+          if (data.type === "progress") {
+            // Update progress bar
+            progress.style.width = `${data.percent}%`;
+            status.textContent = `Processing ${data.current}/${data.total}: ${data.filename}`;
+
+            // Update file item status
+            updateFileItemStatus(data.filename, "processing");
+          } else if (data.type === "result") {
+            // Normalize the result structure to always have .data
+            const result = data.result;
+            if (result.status === "success" && !result.data) {
+              // Wrap the result data if not already wrapped
+              result.data = {
+                email: result.email,
+                country: result.country,
+                plan: result.plan,
+                subscription_type: result.subscription_type,
+                is_premium: result.is_premium,
+                stored_in_db: result.stored_in_db,
+                token: result.token,
+                expires: result.expires,
+                login_urls: result.login_urls,
+                token_error: result.token_error,
+              };
+            }
+            batchResultsData.push(result);
+
+            if (result.status === "success") {
+              validCount++;
+              updateFileItemStatus(result.filename, "valid");
+              addResultToDisplay(result, true);
+            } else {
+              invalidCount++;
+              updateFileItemStatus(result.filename, "invalid");
+              addResultToDisplay(result, false);
+            }
+
+            // Update statistics in real-time
+            updateStats(totalCount, validCount, invalidCount);
+          } else if (data.type === "complete") {
+            // Final completion
+            progress.style.width = "100%";
+            status.textContent = `Complete - ${data.summary.valid} valid, ${data.summary.invalid} invalid`;
+            saveBtn.disabled = false;
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
+
+            showNotification(
+              `Processed: ${data.summary.valid} valid, ${data.summary.invalid} invalid`,
+            );
+          }
+        } catch (e) {
+          console.error("Error parsing SSE data:", e);
+        }
       }
-
-      fileItem.innerHTML = `
-                <div class="file-info">
-                    <span>${statusText}</span>
-                </div>
-                <span class="file-status valid">Valid</span>
-            `;
-      validCount++;
-    } else {
-      fileItem.innerHTML = `
-                <div class="file-info">
-                    <span>❌ ${result.filename}: ${result.message}</span>
-                </div>
-                <span class="file-status invalid">Invalid</span>
-            `;
-      invalidCount++;
     }
-
-    batchResults.appendChild(fileItem);
-  });
-
-  validFiles.textContent = validCount;
-  invalidFiles.textContent = invalidCount;
-
-  // Update success rate
-  const successRate = ((validCount / results.length) * 100).toFixed(2);
-  batchStatus.textContent = `Complete - Success Rate: ${successRate}%`;
+  }
 }
 
-// Handle save results
-function handleSaveResults() {
-  if (batchResultsData.length === 0) {
-    showNotification("No results to save", true);
+function displayBatchResults(results) {
+  const batchResults = document.getElementById("batch-results");
+  batchResults.innerHTML = "";
+  let validCount = 0;
+  let invalidCount = 0;
+
+  console.log("Displaying batch results:", results);
+
+  if (!results || results.length === 0) {
+    batchResults.innerHTML = `
+            <div class="result-placeholder">
+                <i class="fas fa-stream"></i>
+                <span>No results to display</span>
+            </div>
+        `;
+    updateStats(0, 0, 0);
     return;
   }
 
-  let content = "Netflix Cookies Checker - Batch Results\n";
-  content += "Generated on: " + new Date().toLocaleString() + "\n";
-  content += "Created by: Vonez powgie\n\n";
-  content += "=".repeat(80) + "\n\n";
+  results.forEach((result) => {
+    const item = document.createElement("div");
+    item.className = "file-item";
 
-  let validCount = 0;
-  let invalidCount = 0;
-
-  batchResultsData.forEach((result) => {
     if (result.status === "success") {
       validCount++;
-      const account = result.account_info;
-      const token = result.token_result;
+      const data = result.data || result;
+      let extraInfo = "";
 
-      content += `✅ ${result.filename}\n`;
-      content += `NetflixId: ${result.netflix_id}\n`;
-      content += `Status: ${account.ok ? "Valid" : "Invalid"}\n`;
-      content += `Premium: ${account.premium ? "Yes" : "No"}\n`;
-      content += `Country: ${account.country}\n`;
-      content += `Plan: ${account.plan}\n`;
-      content += `Price: ${account.plan_price}\n`;
-      content += `Member Since: ${account.member_since}\n`;
-      content += `Payment Method: ${account.payment_method}\n`;
-      content += `Phone: ${account.phone}\n`;
-      content += `Phone Verified: ${account.phone_verified}\n`;
-      content += `Video Quality: ${account.video_quality}\n`;
-      content += `Max Streams: ${account.max_streams}\n`;
-      content += `Payment Hold: ${account.on_payment_hold}\n`;
-      content += `Extra Member: ${account.extra_member}\n`;
-      content += `Email: ${account.email}\n`;
-      content += `Email Verified: ${account.email_verified}\n`;
-      content += `Profiles: ${account.profiles}\n`;
-      content += `Billing: ${account.next_billing}\n`;
-
-      if (token.status === "Success") {
-        content += `Token: ${token.token}\n`;
-        content += `Login URL: ${token.direct_login_url}\n`;
-        content += `Token Expires: ${new Date(token.expires * 1000).toLocaleString()}\n`;
-        content += `Time Remaining: ${Math.floor(token.time_remaining / 86400)}d ${Math.floor((token.time_remaining % 86400) / 3600)}h ${Math.floor((token.time_remaining % 3600) / 60)}m\n`;
-      } else {
-        content += `Token Error: ${token.error}\n`;
+      if (batchMode === "generate_token" && data.token) {
+        extraInfo = ` | Token: ${data.token.substring(0, 12)}...`;
       }
 
-      content += "\n" + "─".repeat(80) + "\n\n";
+      const storedBadge = data.stored_in_db
+        ? '<span class="stored-badge-small"><i class="fas fa-database"></i></span>'
+        : "";
+
+      item.innerHTML = `
+                <div class="file-icon" style="background: rgba(6,255,165,0.1); color: var(--accent-green);">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="file-info">
+                    <div class="file-name">${escapeHtml(result.filename)} ${storedBadge}</div>
+                    <div class="file-size">${sanitizeDisplay(data.email) || "N/A"} | ${data.country || "N/A"} | ${data.subscription_type || "Unknown"}${extraInfo}</div>
+                </div>
+                <span class="file-status valid">Valid</span>
+            `;
     } else {
       invalidCount++;
-      content += `❌ ${result.filename}: ${result.message}\n\n`;
-      content += "─".repeat(80) + "\n\n";
+      item.innerHTML = `
+                <div class="file-icon" style="background: rgba(230,57,70,0.1); color: var(--accent-red);">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="file-info">
+                    <div class="file-name">${escapeHtml(result.filename)}</div>
+                    <div class="file-size" style="color: var(--accent-red);">${result.message || "Unknown error"}</div>
+                </div>
+                <span class="file-status invalid">Invalid</span>
+            `;
+    }
+    batchResults.appendChild(item);
+  });
+
+  updateStats(results.length, validCount, invalidCount);
+}
+
+// Helper function to update statistics display
+function updateStats(total, valid, invalid) {
+  document.getElementById("total-files").textContent = total;
+  document.getElementById("valid-files").textContent = valid;
+  document.getElementById("invalid-files").textContent = invalid;
+
+  const rate = total > 0 ? ((valid / total) * 100).toFixed(0) : 0;
+  document.getElementById("success-rate").textContent = `${rate}%`;
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function handleSaveResults() {
+  if (batchResultsData.length === 0) return;
+
+  let content = "NETFLIX COOKIE CHECKER - BATCH RESULTS\n";
+  content += "=".repeat(80) + "\n";
+  content += `Generated: ${new Date().toLocaleString()}\n`;
+  content += `Mode: ${batchMode === "check_only" ? "Check Only" : "Generate Token"}\n\n`;
+
+  let validCount = 0;
+
+  batchResultsData.forEach((result) => {
+    const data = result.data || result;
+
+    if (result.status === "success") {
+      validCount++;
+      // FIX: Decode email before saving
+      const decodedEmail = decodeEmail(data.email);
+
+      content += `✅ ${result.filename}\n`;
+      content += `   Email: ${decodedEmail}\n`; // Use decoded email
+      content += `   Country: ${data.country || "N/A"}\n`;
+      content += `   Plan: ${data.plan || "N/A"}\n`;
+      content += `   Type: ${data.subscription_type || "N/A"}\n`;
+      content += `   Premium: ${data.is_premium ? "Yes" : "No"}\n`;
+      content += `   Stored: ${data.stored_in_db ? "Yes" : "No"}\n`;
+
+      if (batchMode === "generate_token") {
+        if (data.token) {
+          content += `   Token: ${data.token}\n`;
+          content += `   Mobile: ${data.login_urls?.phone || "N/A"}\n`;
+          content += `   TV: ${data.login_urls?.tv || "N/A"}\n`;
+          content += `   PC: ${data.login_urls?.pc || "N/A"}\n`;
+          content += `   Expires: ${data.expires ? new Date(data.expires * 1000).toLocaleString() : "N/A"}\n`;
+        } else if (data.token_error) {
+          content += `   Token Error: ${data.token_error}\n`;
+        }
+      }
+
+      content += "-".repeat(80) + "\n";
+    } else {
+      content += `❌ ${result.filename}\n`;
+      content += `   Error: ${result.message || "Unknown error"}\n`;
+      content += "-".repeat(80) + "\n";
     }
   });
 
   content += `\nSUMMARY\n`;
-  content += `Total Files: ${batchResultsData.length}\n`;
+  content += `Total: ${batchResultsData.length}\n`;
   content += `Valid: ${validCount}\n`;
-  content += `Invalid: ${invalidCount}\n`;
-  content += `Success Rate: ${((validCount / batchResultsData.length) * 100).toFixed(2)}%\n`;
+  content += `Invalid: ${batchResultsData.length - validCount}\n`;
+  content += `Success Rate: ${((validCount / batchResultsData.length) * 100).toFixed(1)}%\n`;
 
   const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `netflix_batch_results_${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `netflix_results_${new Date().toISOString().slice(0, 10)}.txt`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showNotification("Results saved successfully");
+
+  showNotification("Results exported successfully");
 }
 
-// Display results - Updated for new design
-function displayResults(data) {
-  let html = "";
+// Premium Accounts Functions
+async function loadAccounts() {
+  const accountsList = document.getElementById("accounts-list");
+  accountsList.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Loading accounts...</span>
+        </div>
+    `;
 
-  if (currentMode === "fullinfo") {
-    const account = data.account_info;
+  try {
+    const data = await apiCall("/api/accounts");
 
-    html = `
-            <div class="result-item">
-                <div class="result-title">
-                    <i class="fas fa-user-circle"></i>
-                    ACCOUNT OVERVIEW
-                    ${data.telegram_sent ? '<span style="background: var(--accent-cyan); color: var(--bg-primary); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; margin-left: 10px;"><i class="fas fa-paper-plane"></i> Sent</span>' : ""}
+    console.log("API Response:", data); // DEBUG
+
+    if (!data) {
+      accountsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Failed to load accounts</span>
                 </div>
-                <div class="result-content">
-                    <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                        <div style="background: ${account.ok ? "var(--accent-green)" : "var(--accent-pink)"}; color: var(--bg-primary); padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">
-                            ${account.ok ? "VALID" : "INVALID"}
-                        </div>
-                        <div style="background: ${account.premium ? "var(--accent-orange)" : "var(--border)"}; color: ${account.premium ? "var(--bg-primary)" : "var(--text-primary)"}; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">
-                            ${account.premium ? "PREMIUM" : "BASIC"}
-                        </div>
-                        <div style="background: var(--accent-purple); color: var(--bg-primary); padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase;">
-                            ${account.country}
-                        </div>
-                    </div>
-                    
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
-                        <div style="color: var(--accent-cyan); font-weight: 700; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;">
-                            <i class="fas fa-id-card"></i> Account Details
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Status:</span>
-                                <span style="color: ${account.ok ? "var(--accent-green)" : "var(--accent-pink)"}; font-weight: 600;">${account.ok ? "Valid" : "Invalid"}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Premium:</span>
-                                <span style="color: ${account.premium ? "var(--accent-orange)" : "var(--text-secondary)"}; font-weight: 600;">${account.premium ? "Yes" : "No"}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Country:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.country}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Plan:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.plan}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Price:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.plan_price}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Member Since:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.member_since}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Payment:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.payment_method}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Phone Verified:</span>
-                                <span style="color: ${account.phone_verified === "Yes" ? "var(--accent-green)" : "var(--accent-pink)"}; font-weight: 600;">${account.phone_verified}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Email Verified:</span>
-                                <span style="color: ${account.email_verified === "Yes" ? "var(--accent-green)" : "var(--accent-pink)"}; font-weight: 600;">${account.email_verified}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Video Quality:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.video_quality}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Max Streams:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.max_streams}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Billing:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${account.next_billing}</span>
-                            </div>
-                        </div>
-                    </div>
+            `;
+      return;
+    }
+
+    if (data.status === "success") {
+      displayAccounts(data.accounts);
+    } else {
+      accountsList.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>${data.message || "Error loading accounts"}</span>
                 </div>
+            `;
+    }
+  } catch (error) {
+    console.error("Load accounts error:", error);
+    accountsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Failed to load accounts</span>
             </div>
         `;
   }
+}
 
-  const token = data.token_result;
-  if (token.status === "Success") {
-    const genTime = new Date(token.generation_time * 1000).toLocaleString();
-    const expTime = new Date(token.expires * 1000).toLocaleString();
+function displayAccounts(accounts) {
+  const accountsList = document.getElementById("accounts-list");
 
-    const days = Math.floor(token.time_remaining / 86400);
-    const hours = Math.floor((token.time_remaining % 86400) / 3600);
-    const minutes = Math.floor((token.time_remaining % 3600) / 60);
-    const seconds = token.time_remaining % 60;
+  console.log("Displaying accounts:", accounts);
 
+  if (!accounts || accounts.length === 0) {
+    accountsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <span>No accounts available</span>
+            </div>
+        `;
+    return;
+  }
+
+  // Store all accounts globally
+  allAccounts = accounts.map((acc) => ({
+    ...acc,
+    email: decodeEmail(acc.email), // Decode email immediately
+  }));
+  filteredAccounts = [...allAccounts];
+
+  renderAccountsUI();
+}
+
+function decodeEmail(email) {
+  if (!email) return "N/A";
+  // Decode \x40 to @ and handle other potential encodings
+  const decoded = email
+    .replace(/\\x40/g, "@")
+    .replace(/%40/g, "@")
+    .replace(/&#64;/g, "@");
+
+  // Return sanitized version for display
+  return sanitizeDisplay(decoded);
+}
+
+function renderAccountsUI() {
+  const accountsList = document.getElementById("accounts-list");
+
+  // Get unique countries and subscription types for filters
+  const countries = [
+    ...new Set(allAccounts.map((a) => a.country).filter(Boolean)),
+  ].sort();
+  const subTypes = [
+    ...new Set(allAccounts.map((a) => a.subscription_type).filter(Boolean)),
+  ].sort();
+
+  // Build filter UI
+  let html = `
+        <div class="accounts-filters">
+            <div class="filter-group">
+                <label><i class="fas fa-search"></i> Search Email</label>
+                <input type="text" id="email-search" placeholder="Search by email..." 
+                       value="${document.getElementById("email-search")?.value || ""}">
+            </div>
+            <div class="filter-group">
+                <label><i class="fas fa-globe"></i> Country</label>
+                <select id="country-filter">
+                    <option value="">All Countries</option>
+                    ${countries.map((c) => `<option value="${c}" ${document.getElementById("country-filter")?.value === c ? "selected" : ""}>${c}</option>`).join("")}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label><i class="fas fa-crown"></i> Subscription</label>
+                <select id="subtype-filter">
+                    <option value="">All Types</option>
+                    ${subTypes.map((t) => `<option value="${t}" ${document.getElementById("subtype-filter")?.value === t ? "selected" : ""}>${t}</option>`).join("")}
+                </select>
+            </div>
+            <div class="filter-stats">
+                Showing ${filteredAccounts.length} of ${allAccounts.length} accounts
+            </div>
+        </div>
+        <div class="accounts-list-items">
+    `;
+
+  if (filteredAccounts.length === 0) {
     html += `
-            <div class="result-item">
-                <div class="result-title">
-                    <i class="fas fa-key"></i>
-                    TOKEN INFORMATION
-                </div>
-                <div class="result-content">
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px; border: 1px solid var(--border);">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Status:</span>
-                                <span style="color: var(--accent-green); font-weight: 600;">${token.status}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Generated:</span>
-                                <span style="color: var(--text-primary); font-weight: 600;">${genTime}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Expires:</span>
-                                <span style="color: var(--accent-pink); font-weight: 600;">${expTime}</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;">
-                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Remaining:</span>
-                                <span style="color: var(--accent-cyan); font-weight: 600;">${days}d ${hours}h ${minutes}m ${seconds}s</span>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <div style="color: var(--accent-cyan); font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Login URL:</div>
-                            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; word-break: break-all; font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--accent-cyan); border: 1px solid var(--border);">
-                                ${token.direct_login_url}
-                            </div>
-                            <button class="btn btn-secondary" style="margin-top: 10px; width: 100%;" onclick="navigator.clipboard.writeText('${token.direct_login_url}').then(() => showNotification('URL copied!'))">
-                                <i class="fas fa-copy"></i> Copy URL
-                            </button>
-                        </div>
-                        
-                        <div>
-                            <div style="color: var(--accent-cyan); font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Token:</div>
-                            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; word-break: break-all; font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--text-secondary); border: 1px solid var(--border);">
-                                ${token.token}
-                            </div>
-                            <button class="btn btn-secondary" style="margin-top: 10px; width: 100%;" onclick="navigator.clipboard.writeText('${token.token}').then(() => showNotification('Token copied!'))">
-                                <i class="fas fa-copy"></i> Copy Token
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <span>No accounts match your filters</span>
             </div>
         `;
   } else {
-    html += `
-            <div class="result-item">
-                <div class="result-title">
-                    <i class="fas fa-times-circle" style="color: var(--accent-pink);"></i>
-                    TOKEN ERROR
-                </div>
-                <div class="result-content">
-                    <div style="background: rgba(255, 42, 109, 0.1); border: 1px solid var(--accent-pink); border-radius: 8px; padding: 15px; color: var(--accent-pink);">
-                        ${token.error}
+    filteredAccounts.forEach((acc) => {
+      html += `
+                <div class="account-item" onclick="generateTokenForAccount('${acc.id}')">
+                    <div class="account-icon">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="account-details">
+                        <div class="account-email">${escapeHtml(acc.email)}</div>
+                        <div class="account-meta">
+                            <span class="account-type">${acc.subscription_type || "Unknown"}</span>
+                            <span class="account-country"><i class="fas fa-globe"></i> ${acc.country || "N/A"}</span>
+                            <span class="account-plan">${acc.plan || "Unknown"}</span>
+                        </div>
+                    </div>
+                    <div class="account-action">
+                        <i class="fas fa-key"></i>
+                        <span>Generate</span>
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+    });
   }
 
-  results.innerHTML = html;
-  copyResultsBtn.disabled = false;
+  html += `</div>`;
+  accountsList.innerHTML = html;
+
+  // Attach event listeners
+  attachFilterListeners();
 }
 
-// Display error
-function displayError(message) {
-  results.innerHTML = `
-        <div class="result-item">
-            <div class="result-title">
-                <i class="fas fa-times-circle" style="color: var(--accent-pink);"></i>
-                Error
+function attachFilterListeners() {
+  const searchInput = document.getElementById("email-search");
+  const countrySelect = document.getElementById("country-filter");
+  const subtypeSelect = document.getElementById("subtype-filter");
+
+  const applyFilters = () => {
+    const searchTerm = searchInput.value.toLowerCase();
+    const country = countrySelect.value;
+    const subType = subtypeSelect.value;
+
+    filteredAccounts = allAccounts.filter((acc) => {
+      const matchEmail = acc.email.toLowerCase().includes(searchTerm);
+      const matchCountry = !country || acc.country === country;
+      const matchType = !subType || acc.subscription_type === subType;
+      return matchEmail && matchCountry && matchType;
+    });
+
+    renderAccountsUI(); // Re-render with filters applied
+  };
+
+  searchInput?.addEventListener("input", debounce(applyFilters, 300));
+  countrySelect?.addEventListener("change", applyFilters);
+  subtypeSelect?.addEventListener("change", applyFilters);
+}
+
+// Debounce helper for search input
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Helper function to escape HTML to prevent XSS
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function generateTokenForAccount(accountId) {
+  showTokenModalLoading();
+
+  try {
+    const data = await apiCall(`/api/accounts/${accountId}/generate-token`, {
+      method: "POST",
+    });
+
+    if (!data) return;
+
+    if (data.status === "success") {
+      displayTokenModal(data.data);
+    } else {
+      hideTokenModal();
+      showNotification(data.message, true);
+    }
+  } catch (error) {
+    hideTokenModal();
+    showNotification("Failed to generate token", true);
+  }
+}
+
+function showTokenModalLoading() {
+  const modalBody = document.getElementById("token-modal-body");
+  modalBody.innerHTML = `
+        <div class="token-loading">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Generating access token...</span>
+        </div>
+    `;
+  tokenModal.classList.add("show");
+}
+
+function displayTokenModal(data) {
+  const expTime = data.expires
+    ? new Date(data.expires * 1000).toLocaleString()
+    : "Unknown";
+
+  const modalBody = document.getElementById("token-modal-body");
+  modalBody.innerHTML = `
+        <div class="token-result">
+            <div class="token-account-info">
+                <h4>${sanitizeDisplay(data.email)}</h4>
+                <span class="token-type">${data.subscription_type}</span>
             </div>
-            <div class="result-content">
-                <div style="background: rgba(255, 42, 109, 0.1); border: 1px solid var(--accent-pink); border-radius: 8px; padding: 15px; color: var(--accent-pink);">
-                    ${message}
+            
+            <div class="device-grid">
+                <div class="device-card phone">
+                    <div class="device-header">
+                        <div class="device-icon"><i class="fas fa-mobile-alt"></i></div>
+                        <div class="device-name">Mobile</div>
+                    </div>
+                    <a href="${data.login_urls.phone}" target="_blank" class="device-link">
+                        <i class="fas fa-external-link-alt"></i> Open
+                    </a>
+                    <button class="btn-copy" onclick="copyToClipboard('${data.login_urls.phone}', 'Link copied!')">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+                
+                <div class="device-card tv">
+                    <div class="device-header">
+                        <div class="device-icon"><i class="fas fa-tv"></i></div>
+                        <div class="device-name">Smart TV</div>
+                    </div>
+                    <a href="${data.login_urls.tv}" target="_blank" class="device-link">
+                        <i class="fas fa-external-link-alt"></i> Open
+                    </a>
+                    <button class="btn-copy" onclick="copyToClipboard('${data.login_urls.tv}', 'Link copied!')">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+                
+                <div class="device-card pc">
+                    <div class="device-header">
+                        <div class="device-icon"><i class="fas fa-laptop"></i></div>
+                        <div class="device-name">PC</div>
+                    </div>
+                    <a href="${data.login_urls.pc}" target="_blank" class="device-link">
+                        <i class="fas fa-external-link-alt"></i> Open
+                    </a>
+                    <button class="btn-copy" onclick="copyToClipboard('${data.login_urls.pc}', 'Link copied!')">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+            
+            <div class="token-details">
+                <div class="token-header">
+                    <span><i class="fas fa-key"></i> Access Token</span>
+                    <span class="token-expires"><i class="fas fa-clock"></i> Expires: ${expTime}</span>
+                </div>
+                <div class="token-value-box">
+                    <code>${data.token}</code>
+                    <button class="btn-copy" onclick="copyToClipboard('${data.token}', 'Token copied!')">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
             </div>
         </div>
     `;
-  copyResultsBtn.disabled = false;
 }
 
-// Show notification
+function hideTokenModal() {
+  tokenModal.classList.remove("show");
+}
+
+// Utilities
+function copyToClipboard(text, successMsg) {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => showNotification(successMsg))
+    .catch(() => showNotification("Failed to copy", true));
+}
+
 function showNotification(message, isError = false) {
-  notification.textContent = message;
-  notification.className = "notification";
-
-  if (isError) {
-    notification.classList.add("error");
-  }
-
+  const notification = document.getElementById("notification");
+  notification.innerHTML = `<i class="fas fa-${isError ? "times-circle" : "check-circle"}"></i><span>${message}</span>`;
+  notification.className = "notification" + (isError ? " error" : "");
   notification.classList.add("show");
 
-  setTimeout(() => {
-    notification.classList.remove("show");
-  }, 3000);
+  setTimeout(() => notification.classList.remove("show"), 3000);
 }
 
-// Telegram functionality
-function loadTelegramConfig() {
-  const savedConfig = localStorage.getItem("telegramConfig");
-  if (savedConfig) {
-    const config = JSON.parse(savedConfig);
-    telegramToggle.checked = config.enabled || false;
-    botTokenInput.value = config.bot_token || "";
-    chatIdInput.value = config.chat_id || "";
-    updateTelegramUI();
+function showUpgradeModal() {
+  showNotification("Please contact admin to upgrade to Premium", true);
+}
+
+// Close modals on outside click
+window.onclick = function (event) {
+  if (event.target === authModal) {
+    hideAuthModal();
   }
-}
-
-function updateTelegramUI() {
-  if (telegramToggle.checked) {
-    telegramConfig.style.display = "block";
-    telegramStatus.className = "telegram-status enabled";
-    telegramStatus.innerHTML =
-      '<i class="fas fa-check-circle"></i> Telegram Enabled';
-  } else {
-    telegramConfig.style.display = "none";
-    telegramStatus.className = "telegram-status disabled";
-    telegramStatus.innerHTML =
-      '<i class="fas fa-times-circle"></i> Telegram Disabled';
+  if (event.target === tokenModal) {
+    hideTokenModal();
   }
-}
+};
 
-function saveTelegramConfig() {
-  const config = {
-    enabled: telegramToggle.checked,
-    bot_token: botTokenInput.value,
-    chat_id: chatIdInput.value,
-  };
-  localStorage.setItem("telegramConfig", JSON.stringify(config));
-  fetch("/api/telegram-config", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(config),
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.status === "success") {
-        showNotification("Configuration saved");
-      }
-    })
-    .catch((error) => {
-      console.error("Error saving config:", error);
-    });
-}
-
-function testTelegramConnection() {
-  if (!botTokenInput.value || !chatIdInput.value) {
-    showNotification("Please enter both Bot Token and Chat ID", true);
-    return;
-  }
-
-  testTelegramBtn.disabled = true;
-  testTelegramBtn.innerHTML = '<div class="spinner"></div> Testing...';
-  telegramStatus.className = "telegram-status testing";
-  telegramStatus.innerHTML = '<i class="fas fa-sync-alt"></i> Testing...';
-
-  const testMessage = {
-    chat_id: chatIdInput.value,
-    text: "✅ *Netflix Checker Test*\n\nYour Telegram integration is working!",
-    parse_mode: "Markdown",
-  };
-
-  fetch(`https://api.telegram.org/bot${botTokenInput.value}/sendMessage`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(testMessage),
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.ok) {
-        telegramStatus.className = "telegram-status enabled";
-        telegramStatus.innerHTML =
-          '<i class="fas fa-check-circle"></i> Connection Successful';
-        showNotification("Test message sent!");
-      } else {
-        telegramStatus.className = "telegram-status disabled";
-        telegramStatus.innerHTML = `<i class="fas fa-times-circle"></i> Error: ${data.description}`;
-        showNotification("Test failed: " + data.description, true);
-      }
-    })
-    .catch((error) => {
-      telegramStatus.className = "telegram-status disabled";
-      telegramStatus.innerHTML =
-        '<i class="fas fa-times-circle"></i> Connection Failed';
-      showNotification("Network error", true);
-    })
-    .finally(() => {
-      testTelegramBtn.disabled = false;
-      testTelegramBtn.innerHTML =
-        '<i class="fas fa-check-circle"></i> Test Connection';
-    });
-}
-
-function initTelegram() {
-  loadTelegramConfig();
-
-  telegramToggle.addEventListener("change", function () {
-    updateTelegramUI();
-    saveTelegramConfig();
-  });
-
-  botTokenInput.addEventListener("input", saveTelegramConfig);
-  chatIdInput.addEventListener("input", saveTelegramConfig);
-  testTelegramBtn.addEventListener("click", testTelegramConnection);
-
-  updateTelegramUI();
-}
+// Make functions available globally
+window.copyToClipboard = copyToClipboard;
+window.showAuthModal = showAuthModal;
+window.hideAuthModal = hideAuthModal;
+window.toggleAuthMode = toggleAuthMode;
+window.logout = logout;
+window.showUpgradeModal = showUpgradeModal;
+window.hideTokenModal = hideTokenModal;
