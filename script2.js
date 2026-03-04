@@ -12,7 +12,7 @@ let filteredAccounts = [];
 
 // API Configuration
 // const API_URL = "https://prem-eu3.bot-hosting.net:21582";
-const API_URL = "http://prem-eu3.bot-hosting.net:21582";
+const API_URL = "https://hadowken-api.vercel.app";
 
 // DOM Elements
 const authModal = document.getElementById("auth-modal");
