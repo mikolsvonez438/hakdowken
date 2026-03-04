@@ -98,21 +98,21 @@ async function handleAuth(e) {
     '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
   try {
-    const response = await fetch(`${API_URL}/api/test`, {
-  method: "GET",
-  headers: { "Content-Type": "application/json" },
-});
+//     const response = await fetch(`${API_URL}/api/test`, {
+//   method: "GET",
+//   headers: { "Content-Type": "application/json" },
+// });
 
 
     
-    // const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
-    // const response = await fetch(`${API_URL}${endpoint}`, {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({ email, password }),
-    //   //credentials: "include", // IMPORTANT
-    //   //mode: "cors",
-    // });
+    const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      //credentials: "include", // IMPORTANT
+      //mode: "cors",
+    });
 
     const data = await response.json();
 
