@@ -98,7 +98,7 @@ async function handleAuth(e) {
     '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
   try {
-    const response = await fetch('http://prem-eu3.bot-hosting.net:21582/api/test', {
+    const response = await fetch('${API_URL}/api/test', {
   method: "GET",
   headers: { "Content-Type": "application/json" },
 });
