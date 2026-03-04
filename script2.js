@@ -103,8 +103,8 @@ async function handleAuth(e) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-      credentials: "include", // IMPORTANT
-      mode: "cors",
+      //credentials: "include", // IMPORTANT
+      //mode: "cors",
     });
 
     const data = await response.json();
