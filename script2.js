@@ -12,7 +12,7 @@ let filteredAccounts = [];
 
 // API Configuration
 // const API_URL = "https://prem-eu3.bot-hosting.net:21582";
-const API_URL = "http://prem-eu3.bot-hosting.net:80";
+const API_URL = "http://prem-eu3.bot-hosting.net:21582";
 
 // DOM Elements
 const authModal = document.getElementById("auth-modal");
@@ -98,14 +98,23 @@ async function handleAuth(e) {
     '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
   try {
-    const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: "POST",
+    const endpoint = "/api/test";
+  const response = await fetch(`${API_URL}${endpoint}`, {
+      method: "get",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
       //credentials: "include", // IMPORTANT
       //mode: "cors",
     });
+
+    
+    // const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+    // const response = await fetch(`${API_URL}${endpoint}`, {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ email, password }),
+    //   //credentials: "include", // IMPORTANT
+    //   //mode: "cors",
+    // });
 
     const data = await response.json();
 
