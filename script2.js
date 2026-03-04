@@ -98,13 +98,11 @@ async function handleAuth(e) {
     '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
   try {
-    const endpoint = "/api/test";
-  const response = await fetch(`${API_URL}${endpoint}`, {
-      method: "get",
-      headers: { "Content-Type": "application/json" },
-      //credentials: "include", // IMPORTANT
-      //mode: "cors",
-    });
+    const response = await fetch('http://prem-eu3.bot-hosting.net:21582/api/test', {
+  method: "GET",
+  headers: { "Content-Type": "application/json" },
+});
+
 
     
     // const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
