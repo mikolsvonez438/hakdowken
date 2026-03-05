@@ -9,6 +9,7 @@ async function initializeEncryption() {
 }
 
 // Modified API call function with automatic decryption
+// Replace your existing apiCall function with this:
 async function apiCall(endpoint, options = {}) {
     const headers = {
         "Content-Type": "application/json",
@@ -36,7 +37,7 @@ async function apiCall(endpoint, options = {}) {
     const data = await response.json();
     
     // Auto-decrypt if encrypted
-    if (data && data.encrypted) {
+    if (data && data.encrypted === true) {
         try {
             // Ensure crypto is initialized
             if (!apiCrypto.masterKey) {
@@ -45,11 +46,15 @@ async function apiCall(endpoint, options = {}) {
             }
             
             const decrypted = await apiCrypto.processResponse(data);
+            
+            // Debug: Log to see what's happening
+            console.log("Decrypted data:", decrypted);
+            
             return decrypted;
         } catch (e) {
             console.error('Decryption error:', e);
             showNotification('Failed to decrypt data', true);
-            return data; // Return encrypted as fallback
+            return data;
         }
     }
 
