@@ -314,7 +314,7 @@ function initTabs() {
     tab.addEventListener("click", () => {
       const tabId = tab.dataset.tab;
 
-      console.log("Tab clicked:", tabId); // DEBUG
+      //console.log("Tab clicked:", tabId); // DEBUG
 
       // Check auth for protected tabs
       if (
@@ -347,7 +347,7 @@ function initTabs() {
         selectedContent = document.getElementById(`${tabId}-tab`);
       }
 
-      console.log("Selected content:", selectedContent); // DEBUG
+      //console.log("Selected content:", selectedContent); // DEBUG
 
       if (selectedContent) {
         selectedContent.style.display = "block";
@@ -356,7 +356,7 @@ function initTabs() {
 
       // Load accounts if accounts tab
       if (tabId === "accounts" && isPremium) {
-        console.log("Loading accounts..."); // DEBUG
+        //console.log("Loading accounts..."); // DEBUG
         loadAccounts();
       }
     });
@@ -1339,7 +1339,7 @@ function displayBatchResults(results) {
   let validCount = 0;
   let invalidCount = 0;
 
-  console.log("Displaying batch results:", results);
+  //console.log("Displaying batch results:", results);
 
   if (!results || results.length === 0) {
     batchResults.innerHTML = `
@@ -1494,7 +1494,7 @@ async function loadAccounts() {
   try {
     const data = await apiCall("/api/accounts");
 
-    console.log("API Response:", data); // DEBUG
+    //console.log("API Response:", data); // DEBUG
 
     if (!data) {
       accountsList.innerHTML = `
@@ -1530,7 +1530,7 @@ async function loadAccounts() {
 function displayAccounts(accounts) {
   const accountsList = document.getElementById("accounts-list");
 
-  console.log("Displaying accounts:", accounts);
+  //console.log("Displaying accounts:", accounts);
 
   if (!accounts || accounts.length === 0) {
     accountsList.innerHTML = `
