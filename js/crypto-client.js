@@ -1,5 +1,6 @@
 /**
- * Client-side decryption for PyCryptodome AES-256-CBC + HMAC
+ * Client-side decryption module using Web Crypto API
+ * Matches server-side Pure Python encryption
  */
 
 class APIDecryption {
@@ -11,11 +12,13 @@ class APIDecryption {
 
     async initialize(masterKeyBase64) {
         try {
-            const keyBytes = this.base64ToArrayBuffer(masterKeyBase64);
+            // Remove padding if present and decode
+            const cleanKey = masterKeyBase64.replace(/=/g, '');
+            const keyBytes = this.base64ToArrayBuffer(cleanKey + '=='.substring(0, (4 - cleanKey.length % 4) % 4));
             this.masterKey = new Uint8Array(keyBytes);
             return true;
         } catch (error) {
-            console.error('Failed to initialize:', error);
+            console.error('Failed to initialize decryption:', error);
             return false;
         }
     }
@@ -27,13 +30,17 @@ class APIDecryption {
         }
 
         try {
-            // PBKDF2 using Web Crypto API
+            // Build key material: masterKey + fieldName
             const encoder = new TextEncoder();
-            const passwordBuffer = new Uint8Array([...this.masterKey, ...encoder.encode(fieldName)]);
-            
-            const importedKey = await crypto.subtle.importKey(
+            const fieldBytes = encoder.encode(fieldName);
+            const combined = new Uint8Array(this.masterKey.length + fieldBytes.length);
+            combined.set(this.masterKey);
+            combined.set(fieldBytes, this.masterKey.length);
+
+            // Import for PBKDF2
+            const baseKey = await crypto.subtle.importKey(
                 'raw',
-                passwordBuffer,
+                combined,
                 { name: 'PBKDF2' },
                 false,
                 ['deriveBits']
@@ -41,6 +48,7 @@ class APIDecryption {
 
             const saltBuffer = encoder.encode(this.salt);
             
+            // Derive 256 bits
             const derivedBits = await crypto.subtle.deriveBits(
                 {
                     name: 'PBKDF2',
@@ -48,11 +56,12 @@ class APIDecryption {
                     iterations: 100000,
                     hash: 'SHA-256'
                 },
-                importedKey,
+                baseKey,
                 256
             );
 
-            const key = await crypto.subtle.importKey(
+            // Import as AES-CBC key
+            const aesKey = await crypto.subtle.importKey(
                 'raw',
                 derivedBits,
                 { name: 'AES-CBC' },
@@ -60,39 +69,52 @@ class APIDecryption {
                 ['decrypt']
             );
 
-            this.keyCache.set(cacheKey, key);
-            return key;
+            this.keyCache.set(cacheKey, aesKey);
+            return aesKey;
         } catch (error) {
-            console.error(`Key derivation failed:`, error);
+            console.error(`Key derivation failed for ${fieldName}:`, error);
             throw error;
         }
     }
 
     async decryptField(encryptedPayload) {
-        if (!encryptedPayload || !encryptedPayload.e) {
+        if (!encryptedPayload || encryptedPayload.e !== true) {
             return encryptedPayload?.value || encryptedPayload;
         }
 
         try {
             const { v: ciphertextB64, i: ivB64, f: fieldName } = encryptedPayload;
             
-            const ciphertext = this.base64ToArrayBuffer(ciphertextB64);
-            const iv = this.base64ToArrayBuffer(ivB64);
+            // Handle potential padding issues
+            const cleanCipher = ciphertextB64.replace(/=/g, '');
+            const cleanIv = ivB64.replace(/=/g, '');
+            
+            const ciphertext = this.base64ToArrayBuffer(
+                cleanCipher + '=='.substring(0, (4 - cleanCipher.length % 4) % 4)
+            );
+            const iv = this.base64ToArrayBuffer(
+                cleanIv + '=='.substring(0, (4 - cleanIv.length % 4) % 4)
+            );
             
             const key = await this.deriveKey(fieldName);
             
             const decrypted = await crypto.subtle.decrypt(
                 {
                     name: 'AES-CBC',
-                    iv: iv
+                    iv: new Uint8Array(iv)
                 },
                 key,
                 ciphertext
             );
 
-            return new TextDecoder().decode(decrypted);
+            // Remove PKCS7 padding manually
+            const decryptedBytes = new Uint8Array(decrypted);
+            const paddingLength = decryptedBytes[decryptedBytes.length - 1];
+            const unpadded = decryptedBytes.slice(0, decryptedBytes.length - paddingLength);
+            
+            return new TextDecoder().decode(unpadded);
         } catch (error) {
-            console.error('Decryption failed:', error);
+            console.error('Decryption failed for field:', encryptedPayload.f, error);
             return '[decryption_failed]';
         }
     }
@@ -104,9 +126,11 @@ class APIDecryption {
         
         for (const [key, value] of Object.entries(data)) {
             if (value && typeof value === 'object') {
-                if (value.e === true) {
+                // Check if this is an encrypted field (has 'e': true)
+                if (value.e === true && value.v && value.i) {
                     decrypted[key] = await this.decryptField(value);
-                } else if (key === 'login_urls' && typeof value === 'object') {
+                } else if (key === 'login_urls' && typeof value === 'object' && !Array.isArray(value)) {
+                    // Handle nested login_urls object
                     decrypted[key] = {};
                     for (const [urlKey, urlValue] of Object.entries(value)) {
                         if (urlValue && urlValue.e === true) {
@@ -115,7 +139,18 @@ class APIDecryption {
                             decrypted[key][urlKey] = urlValue;
                         }
                     }
+                } else if (Array.isArray(value)) {
+                    // Handle arrays
+                    decrypted[key] = await Promise.all(
+                        value.map(async (item) => {
+                            if (typeof item === 'object') {
+                                return await this.decryptResponse(item);
+                            }
+                            return item;
+                        })
+                    );
                 } else {
+                    // Recurse into nested objects
                     decrypted[key] = await this.decryptResponse(value);
                 }
             } else {
@@ -127,7 +162,9 @@ class APIDecryption {
     }
 
     async processResponse(apiResponse) {
-        if (!apiResponse || !apiResponse.encrypted) return apiResponse;
+        if (!apiResponse || apiResponse.encrypted !== true) {
+            return apiResponse;
+        }
 
         try {
             const decryptedData = await this.decryptResponse(apiResponse.data);
@@ -137,7 +174,7 @@ class APIDecryption {
                 decrypted: true
             };
         } catch (error) {
-            console.error('Decryption failed:', error);
+            console.error('Failed to process encrypted response:', error);
             throw error;
         }
     }
@@ -157,4 +194,6 @@ class APIDecryption {
     }
 }
 
-window.apiCrypto = new APIDecryption();
+// Global instance
+const apiCrypto = new APIDecryption();
+window.apiCrypto = apiCrypto;
