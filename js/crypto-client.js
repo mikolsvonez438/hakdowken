@@ -1,6 +1,5 @@
 /**
- * Client-side decryption module using Web Crypto API
- * Matches server-side AES-256-GCM encryption
+ * Client-side decryption for PyCryptodome AES-256-CBC + HMAC
  */
 
 class APIDecryption {
@@ -10,34 +9,17 @@ class APIDecryption {
         this.salt = 'netflix_checker_salt_v1';
     }
 
-    /**
-     * Initialize with master key from server (delivered securely after auth)
-     * In production, this should be delivered via secure channel or derived from user password
-     */
     async initialize(masterKeyBase64) {
         try {
-            // Decode base64 key
             const keyBytes = this.base64ToArrayBuffer(masterKeyBase64);
-            
-            // Import as raw key material
-            this.masterKey = await crypto.subtle.importKey(
-                'raw',
-                keyBytes,
-                { name: 'PBKDF2' },
-                false,
-                ['deriveBits', 'deriveKey']
-            );
-            
+            this.masterKey = new Uint8Array(keyBytes);
             return true;
         } catch (error) {
-            console.error('Failed to initialize decryption:', error);
+            console.error('Failed to initialize:', error);
             return false;
         }
     }
 
-    /**
-     * Derive field-specific key using PBKDF2 (matching server implementation)
-     */
     async deriveKey(fieldName) {
         const cacheKey = fieldName;
         if (this.keyCache.has(cacheKey)) {
@@ -45,10 +27,20 @@ class APIDecryption {
         }
 
         try {
-            // Convert salt to ArrayBuffer
-            const saltBuffer = new TextEncoder().encode(this.salt);
+            // PBKDF2 using Web Crypto API
+            const encoder = new TextEncoder();
+            const passwordBuffer = new Uint8Array([...this.masterKey, ...encoder.encode(fieldName)]);
             
-            // Derive bits using PBKDF2
+            const importedKey = await crypto.subtle.importKey(
+                'raw',
+                passwordBuffer,
+                { name: 'PBKDF2' },
+                false,
+                ['deriveBits']
+            );
+
+            const saltBuffer = encoder.encode(this.salt);
+            
             const derivedBits = await crypto.subtle.deriveBits(
                 {
                     name: 'PBKDF2',
@@ -56,15 +48,14 @@ class APIDecryption {
                     iterations: 100000,
                     hash: 'SHA-256'
                 },
-                this.masterKey,
+                importedKey,
                 256
             );
 
-            // Import derived bits as AES key
             const key = await crypto.subtle.importKey(
                 'raw',
                 derivedBits,
-                { name: 'AES-GCM' },
+                { name: 'AES-CBC' },
                 false,
                 ['decrypt']
             );
@@ -72,46 +63,33 @@ class APIDecryption {
             this.keyCache.set(cacheKey, key);
             return key;
         } catch (error) {
-            console.error(`Key derivation failed for ${fieldName}:`, error);
+            console.error(`Key derivation failed:`, error);
             throw error;
         }
     }
 
-    /**
-     * Decrypt a single encrypted field
-     */
     async decryptField(encryptedPayload) {
         if (!encryptedPayload || !encryptedPayload.e) {
-            // Not encrypted, return as-is
             return encryptedPayload?.value || encryptedPayload;
         }
 
         try {
-            const { v: ciphertextB64, i: ivB64, t: tagB64, f: fieldName } = encryptedPayload;
-
-            // Decode base64 components
+            const { v: ciphertextB64, i: ivB64, f: fieldName } = encryptedPayload;
+            
             const ciphertext = this.base64ToArrayBuffer(ciphertextB64);
             const iv = this.base64ToArrayBuffer(ivB64);
-            const tag = this.base64ToArrayBuffer(tagB64);
-
-            // Combine ciphertext + tag (server sends them separately, but AES-GCM expects together)
-            const encryptedData = this.concatArrayBuffers(ciphertext, tag);
-
-            // Derive field-specific key
+            
             const key = await this.deriveKey(fieldName);
-
-            // Decrypt
+            
             const decrypted = await crypto.subtle.decrypt(
                 {
-                    name: 'AES-GCM',
-                    iv: iv,
-                    tagLength: 128
+                    name: 'AES-CBC',
+                    iv: iv
                 },
                 key,
-                encryptedData
+                ciphertext
             );
 
-            // Decode to string
             return new TextDecoder().decode(decrypted);
         } catch (error) {
             console.error('Decryption failed:', error);
@@ -119,23 +97,16 @@ class APIDecryption {
         }
     }
 
-    /**
-     * Recursively decrypt response data object
-     */
     async decryptResponse(data) {
-        if (!data || typeof data !== 'object') {
-            return data;
-        }
+        if (!data || typeof data !== 'object') return data;
 
         const decrypted = {};
         
         for (const [key, value] of Object.entries(data)) {
             if (value && typeof value === 'object') {
                 if (value.e === true) {
-                    // This is an encrypted field
                     decrypted[key] = await this.decryptField(value);
                 } else if (key === 'login_urls' && typeof value === 'object') {
-                    // Special handling for login_urls object
                     decrypted[key] = {};
                     for (const [urlKey, urlValue] of Object.entries(value)) {
                         if (urlValue && urlValue.e === true) {
@@ -145,7 +116,6 @@ class APIDecryption {
                         }
                     }
                 } else {
-                    // Recursively decrypt nested objects
                     decrypted[key] = await this.decryptResponse(value);
                 }
             } else {
@@ -156,14 +126,8 @@ class APIDecryption {
         return decrypted;
     }
 
-    /**
-     * Process full API response
-     */
     async processResponse(apiResponse) {
-        if (!apiResponse || !apiResponse.encrypted) {
-            // Not encrypted, return as-is
-            return apiResponse;
-        }
+        if (!apiResponse || !apiResponse.encrypted) return apiResponse;
 
         try {
             const decryptedData = await this.decryptResponse(apiResponse.data);
@@ -173,12 +137,11 @@ class APIDecryption {
                 decrypted: true
             };
         } catch (error) {
-            console.error('Failed to process encrypted response:', error);
-            throw new Error('Decryption failed: ' + error.message);
+            console.error('Decryption failed:', error);
+            throw error;
         }
     }
 
-    // Utility functions
     base64ToArrayBuffer(base64) {
         const binaryString = atob(base64);
         const bytes = new Uint8Array(binaryString.length);
@@ -188,24 +151,10 @@ class APIDecryption {
         return bytes.buffer;
     }
 
-    concatArrayBuffers(buffer1, buffer2) {
-        const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
-        tmp.set(new Uint8Array(buffer1), 0);
-        tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
-        return tmp.buffer;
-    }
-
-    /**
-     * Clear key cache (call on logout)
-     */
     clearCache() {
         this.keyCache.clear();
         this.masterKey = null;
     }
 }
 
-// Global instance
-const apiCrypto = new APIDecryption();
-
-// Export for use in other modules
-window.apiCrypto = apiCrypto;
+window.apiCrypto = new APIDecryption();
