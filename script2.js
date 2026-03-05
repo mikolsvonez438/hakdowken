@@ -1,17 +1,33 @@
-// Test API
 const API_URL = "https://hadowken-api.vercel.app";
 
-async function testAPI() {
-    try {
-        const response = await fetch(`${API_URL}/api/health`);
-        const data = await response.json();
-        console.log("API Health:", data);
-        alert("API is working! Check console.");
-    } catch (e) {
-        console.error("API Error:", e);
-        alert("API Error: " + e.message);
+async function apiCall(endpoint, options = {}) {
+    const headers = {
+        "Content-Type": "application/json",
+        ...options.headers,
+    };
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        method: options.method || "GET",
+        headers: headers,
+        body: options.body,
+        credentials: "include",
+    });
+
+    if (response.status === 401) {
+        alert("Session expired");
+        return null;
     }
+
+    return response.json();
 }
 
-// Call this on page load or button click
-testAPI();
+// Test on load
+async function testConnection() {
+    const health = await apiCall('/api/health');
+    console.log("Health:", health);
+    
+    const test = await apiCall('/api/test');
+    console.log("Test:", test);
+}
+
+testConnection();
