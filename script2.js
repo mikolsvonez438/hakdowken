@@ -950,53 +950,118 @@ function updateFileList() {
 }
 
 async function handleProcessBatch() {
-  if (selectedFiles.length === 0) {
-    showNotification("Please select files first", true);
-    return;
-  }
-
-  batchResultsData = [];
-  const batchResults = document.getElementById("batch-results");
-  batchResults.innerHTML = ""; // Clear previous results
-
-  const btn = document.getElementById("process-batch-btn");
-  const progress = document.getElementById("batch-progress");
-  const status = document.getElementById("batch-status");
-  const saveBtn = document.getElementById("save-results-btn");
-
-  btn.disabled = true;
-  saveBtn.disabled = true;
-  btn.innerHTML =
-    '<i class="fas fa-circle-notch fa-spin"></i><span>Processing...</span>';
-  progress.style.width = "0%";
-  status.textContent = "Starting...";
-
-  // Reset statistics
-  updateStats(selectedFiles.length, 0, 0);
-
-  const formData = new FormData();
-  selectedFiles.forEach((file) => formData.append("files", file));
-  formData.append("mode", batchMode);
-
-  // Update file list to show processing state
-  updateFileListProcessingState();
-
-  try {
-    if (useStreaming && window.EventSource) {
-      // Use streaming for real-time updates
-      await processBatchStreaming(formData, progress, status, btn, saveBtn);
-    } else {
-      // Fallback to regular fetch
-      await processBatchRegular(formData, progress, status, btn, saveBtn);
+    if (selectedFiles.length === 0) {
+        showNotification("Please select files first", true);
+        return;
     }
-  } catch (error) {
-    console.error("Batch processing error:", error);
-    progress.style.width = "100%";
-    status.textContent = "Failed";
-    showNotification(error.message, true);
-    btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
-  }
+
+    batchResultsData = [];
+    const batchResults = document.getElementById("batch-results");
+    batchResults.innerHTML = "";
+
+    const btn = document.getElementById("process-batch-btn");
+    const progress = document.getElementById("batch-progress");
+    const status = document.getElementById("batch-status");
+    const saveBtn = document.getElementById("save-results-btn");
+
+    btn.disabled = true;
+    saveBtn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Starting...</span>';
+    
+    // Create form data
+    const formData = new FormData();
+    selectedFiles.forEach((file) => formData.append("files", file));
+    formData.append("mode", batchMode);
+
+    try {
+        // Step 1: Start the job
+        const startResponse = await fetch(`${API_URL}/api/batch-check-start`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+            },
+            body: formData,
+        });
+
+        const startData = await startResponse.json();
+        
+        if (startData.status !== 'success') {
+            throw new Error(startData.message || 'Failed to start job');
+        }
+
+        const jobId = startData.job_id;
+        status.textContent = `Processing ${startData.total_files} files...`;
+        
+        // Step 2: Poll for progress
+        let isComplete = false;
+        let attempts = 0;
+        const maxAttempts = 300; // 10 minutes max (2 second intervals)
+        
+        while (!isComplete && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            
+            const statusResponse = await fetch(`${API_URL}/api/batch-check-status/${jobId}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            
+            const statusData = await statusResponse.json();
+            
+            if (statusData.status !== 'success') {
+                throw new Error(statusData.message);
+            }
+            
+            const prog = statusData.progress;
+            progress.style.width = `${prog.percent}%`;
+            status.textContent = `Processing ${prog.processed}/${prog.total}: ${prog.current_file || '...'}`;
+            
+            // Update stats
+            updateStats(prog.total, prog.valid, prog.invalid);
+            
+            // Update file list status
+            if (prog.current_file) {
+                updateFileItemStatus(prog.current_file, 'processing');
+            }
+            
+            if (statusData.job_status === 'completed') {
+                isComplete = true;
+                
+                // Get final results
+                const resultsResponse = await fetch(`${API_URL}/api/batch-check-results/${jobId}`, {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                
+                const resultsData = await resultsResponse.json();
+                
+                if (resultsData.status === 'success') {
+                    batchResultsData = resultsData.results;
+                    displayBatchResults(batchResultsData);
+                    
+                    progress.style.width = "100%";
+                    status.textContent = `Complete - ${resultsData.summary.valid} valid, ${resultsData.summary.invalid} invalid`;
+                    saveBtn.disabled = false;
+                    
+                    showNotification(`Processed: ${resultsData.summary.valid} valid, ${resultsData.summary.invalid} invalid`);
+                }
+            } else if (statusData.job_status === 'error') {
+                throw new Error('Processing failed');
+            }
+            
+            attempts++;
+        }
+        
+        if (!isComplete) {
+            throw new Error('Processing timed out after 10 minutes');
+        }
+        
+    } catch (error) {
+        console.error("Batch processing error:", error);
+        progress.style.width = "100%";
+        status.textContent = "Failed: " + error.message;
+        showNotification(error.message, true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
+    }
 }
 
 async function processBatchRegular(formData, progress, status, btn, saveBtn) {
