@@ -88,58 +88,73 @@ function toggleAuthMode() {
 }
 
 async function handleAuth(e) {
-  e.preventDefault();
-  const email = document.getElementById("auth-email").value;
-  const password = document.getElementById("auth-password").value;
-  const submitBtn = document.getElementById("auth-submit");
+    e.preventDefault();
+    const email = document.getElementById("auth-email").value;
+    const password = document.getElementById("auth-password").value;
+    const submitBtn = document.getElementById("auth-submit");
 
-  submitBtn.disabled = true;
-  submitBtn.innerHTML =
-    '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
-  try {
-//     const response = await fetch(`${API_URL}/api/test`, {
-//   method: "GET",
-//   headers: { "Content-Type": "application/json" },
-// });
+    try {
+        const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+        });
 
+        const data = await response.json();
 
-    
-    const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      //credentials: "include", // IMPORTANT
-      //mode: "cors",
-    });
-
-    const data = await response.json();
-
-    if (data.status === "success") {
-      if (isLoginMode) {
-        // Store session
-        accessToken = data.session.access_token;
-        currentUser = data.user;
-        isPremium = data.user.is_premium;
-        localStorage.setItem("access_token", accessToken);
-        localStorage.setItem("refresh_token", data.session.refresh_token);
-        updateUIForUser();
-        hideAuthModal();
-        showNotification("Login successful!");
-      } else {
-        showNotification("Account created! Please login.");
-        toggleAuthMode();
-      }
-    } else {
-      authError.textContent = data.message;
+        if (data.status === "success") {
+            if (isLoginMode) {
+                let session, user;
+                
+                // Handle encrypted response
+                if (data.encrypted && data.data) {
+                    // Initialize crypto first
+                    const key = localStorage.getItem('api_encryption_key');
+                    if (key) {
+                        await apiCrypto.initialize(key);
+                    } else {
+                        // Fetch key if not in storage
+                        await fetchEncryptionKey();
+                    }
+                    
+                    // Decrypt the data
+                    const decrypted = await apiCrypto.decryptResponse(data.data);
+                    session = decrypted.session;
+                    user = decrypted.user;
+                } else {
+                    // Plaintext response (fallback)
+                    session = data.session;
+                    user = data.user;
+                }
+                
+                accessToken = session.access_token;
+                currentUser = user;
+                isPremium = user.is_premium;
+                
+                localStorage.setItem("access_token", accessToken);
+                localStorage.setItem("refresh_token", session.refresh_token);
+                
+                updateUIForUser();
+                hideAuthModal();
+                showNotification("Login successful!");
+            } else {
+                showNotification("Account created! Please login.");
+                toggleAuthMode();
+            }
+        } else {
+            authError.textContent = data.message;
+        }
+    } catch (error) {
+        console.error("Auth error:", error);
+        authError.textContent = "Network error. Please try again.";
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
     }
-  } catch (error) {
-    authError.textContent = "Network error. Please try again.";
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
-  }
 }
 
 async function checkSession() {
