@@ -80,19 +80,48 @@ async function handleAuth(e) {
         });
 
         const data = await response.json();
+        console.log('Auth response:', data);
 
         if (data.status === "success") {
             if (isLoginMode) {
-                accessToken = data.session.access_token;
-                currentUser = data.user;
-                isPremium = data.user.is_premium;
-                
+                let session, user;
+
+                // Handle encrypted response
+                if (data.encrypted === true) {
+                    // Make sure crypto is ready
+                    const key = localStorage.getItem('api_encryption_key');
+                    if (!key) {
+                        // Generate or fetch key if not exists
+                        console.log('No encryption key, fetching...');
+                        await fetchEncryptionKey();
+                    } else {
+                        await apiCrypto.initialize(key);
+                    }
+
+                    // Decrypt the data
+                    const decrypted = await apiCrypto.decryptObject(data.data);
+                    console.log('Decrypted login data:', decrypted);
+                    
+                    session = decrypted.session;
+                    user = decrypted.user;
+                } else {
+                    // Plaintext fallback
+                    session = data.session;
+                    user = data.user;
+                }
+
+                // Validate we got the data
+                if (!session || !user) {
+                    throw new Error('Failed to get session or user data');
+                }
+
+                accessToken = session.access_token;
+                currentUser = user;
+                isPremium = user.is_premium;
+
                 localStorage.setItem("access_token", accessToken);
-                localStorage.setItem("refresh_token", data.session.refresh_token);
-                
-                // Fetch and store encryption key
-                await fetchEncryptionKey();
-                
+                localStorage.setItem("refresh_token", session.refresh_token);
+
                 updateUIForUser();
                 hideAuthModal();
                 showNotification("Login successful!");
@@ -101,10 +130,11 @@ async function handleAuth(e) {
                 toggleAuthMode();
             }
         } else {
-            authError.textContent = data.message;
+            authError.textContent = data.message || 'Login failed';
         }
     } catch (error) {
-        authError.textContent = "Network error. Please try again.";
+        console.error("Auth error:", error);
+        authError.textContent = "Error: " + (error.message || "Network error");
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
