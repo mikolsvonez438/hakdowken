@@ -966,93 +966,56 @@ async function handleProcessBatch() {
 
     btn.disabled = true;
     saveBtn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Starting...</span>';
-    
-    // Create form data
-    const formData = new FormData();
-    selectedFiles.forEach((file) => formData.append("files", file));
-    formData.append("mode", batchMode);
+
+    // Process in chunks of 15 files to stay under 10 second limit
+    const CHUNK_SIZE = 15;
+    const totalChunks = Math.ceil(selectedFiles.length / CHUNK_SIZE);
+    let allResults = [];
+    let validCount = 0;
+    let invalidCount = 0;
 
     try {
-        // Step 1: Start the job
-        const startResponse = await fetch(`${API_URL}/api/batch-check-start`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-            body: formData,
-        });
-
-        const startData = await startResponse.json();
-        
-        if (startData.status !== 'success') {
-            throw new Error(startData.message || 'Failed to start job');
-        }
-
-        const jobId = startData.job_id;
-        status.textContent = `Processing ${startData.total_files} files...`;
-        
-        // Step 2: Poll for progress
-        let isComplete = false;
-        let attempts = 0;
-        const maxAttempts = 300; // 10 minutes max (2 second intervals)
-        
-        while (!isComplete && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, selectedFiles.length);
+            const chunk = selectedFiles.slice(start, end);
             
-            const statusResponse = await fetch(`${API_URL}/api/batch-check-status/${jobId}`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
+            status.textContent = `Processing chunk ${chunkIndex + 1}/${totalChunks} (${start + 1}-${end} of ${selectedFiles.length})`;
+            
+            const formData = new FormData();
+            chunk.forEach((file) => formData.append("files", file));
+            formData.append("mode", batchMode);
+
+            // Process this chunk with streaming
+            const chunkResults = await processBatchChunk(formData, progress, start, selectedFiles.length);
+            allResults.push(...chunkResults);
+            
+            // Update counts
+            chunkResults.forEach(result => {
+                if (result.status === 'success') {
+                    validCount++;
+                } else {
+                    invalidCount++;
+                }
             });
             
-            const statusData = await statusResponse.json();
+            // Update display after each chunk
+            displayBatchResults(allResults);
+            updateStats(selectedFiles.length, validCount, invalidCount);
             
-            if (statusData.status !== 'success') {
-                throw new Error(statusData.message);
+            // Small delay between chunks to prevent overwhelming
+            if (chunkIndex < totalChunks - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
-            
-            const prog = statusData.progress;
-            progress.style.width = `${prog.percent}%`;
-            status.textContent = `Processing ${prog.processed}/${prog.total}: ${prog.current_file || '...'}`;
-            
-            // Update stats
-            updateStats(prog.total, prog.valid, prog.invalid);
-            
-            // Update file list status
-            if (prog.current_file) {
-                updateFileItemStatus(prog.current_file, 'processing');
-            }
-            
-            if (statusData.job_status === 'completed') {
-                isComplete = true;
-                
-                // Get final results
-                const resultsResponse = await fetch(`${API_URL}/api/batch-check-results/${jobId}`, {
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                });
-                
-                const resultsData = await resultsResponse.json();
-                
-                if (resultsData.status === 'success') {
-                    batchResultsData = resultsData.results;
-                    displayBatchResults(batchResultsData);
-                    
-                    progress.style.width = "100%";
-                    status.textContent = `Complete - ${resultsData.summary.valid} valid, ${resultsData.summary.invalid} invalid`;
-                    saveBtn.disabled = false;
-                    
-                    showNotification(`Processed: ${resultsData.summary.valid} valid, ${resultsData.summary.invalid} invalid`);
-                }
-            } else if (statusData.job_status === 'error') {
-                throw new Error('Processing failed');
-            }
-            
-            attempts++;
         }
+
+        batchResultsData = allResults;
+        progress.style.width = "100%";
+        status.textContent = `Complete - ${validCount} valid, ${invalidCount} invalid`;
+        saveBtn.disabled = false;
         
-        if (!isComplete) {
-            throw new Error('Processing timed out after 10 minutes');
-        }
-        
+        showNotification(`Processed all ${selectedFiles.length} files!`);
+
     } catch (error) {
         console.error("Batch processing error:", error);
         progress.style.width = "100%";
@@ -1064,6 +1027,65 @@ async function handleProcessBatch() {
     }
 }
 
+async function processBatchChunk(formData, progressBar, startIndex, totalFiles) {
+    const results = [];
+    
+    const response = await fetch(`${API_URL}/api/batch-check`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "text/event-stream",
+        },
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    if (data.type === "progress") {
+                        // Calculate overall progress
+                        const overallCurrent = startIndex + data.current;
+                        const overallPercent = (overallCurrent / totalFiles) * 100;
+                        progressBar.style.width = `${overallPercent}%`;
+                    } else if (data.type === "result") {
+                        results.push(data.result);
+                        
+                        // Add to display immediately
+                        if (data.result.status === 'success') {
+                            addResultToDisplay(data.result, true);
+                        } else {
+                            addResultToDisplay(data.result, false);
+                        }
+                    } else if (data.type === "complete") {
+                        return results;
+                    }
+                } catch (e) {
+                    console.error("Parse error:", e);
+                }
+            }
+        }
+    }
+    
+    return results;
+}
 async function processBatchRegular(formData, progress, status, btn, saveBtn) {
   // Fallback for browsers that don't support streaming
   progress.style.width = "50%";
