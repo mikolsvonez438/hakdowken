@@ -1869,6 +1869,25 @@ window.onclick = function (event) {
   }
 };
 
+// Add to your frontend API client
+api.interceptors.response.use(
+  (response) => {
+    // Check for new token in response headers
+    const newToken = response.headers['x-new-token'];
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    }
+    return response;
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired, redirect to login
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Make functions available globally
 window.copyToClipboard = copyToClipboard;
 window.showAuthModal = showAuthModal;
