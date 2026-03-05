@@ -122,7 +122,8 @@ async function handleAuth(e) {
                     }
                     
                     // Decrypt the data
-                    const decrypted = await apiCrypto.decryptResponse(data.data);
+                    // const decrypted = await apiCrypto.decryptResponse(data.data);
+                    const decrypted = await apiCrypto.decryptObject(data.data);
                     session = decrypted.session;
                     user = decrypted.user;
                 } else {
@@ -318,7 +319,35 @@ async function apiCall(endpoint, options = {}) {
     return null;
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  // Auto-decrypt if encrypted
+  if (data && data.encrypted === true) {
+    try {
+      // Ensure crypto is initialized
+      if (!apiCrypto.masterKey) {
+        const key = localStorage.getItem('api_encryption_key');
+        if (!key) {
+          console.error('No encryption key available');
+          throw new Error('Encryption key not found');
+        }
+        await apiCrypto.initialize(key);
+      }
+      
+      // processResponse returns { status, encrypted, version, data: decrypted, decrypted: true }
+      const decrypted = await apiCrypto.processResponse(data);
+      
+      // Return the decrypted structure (contains .data property with actual payload)
+      return decrypted;
+      
+    } catch (e) {
+      console.error('Decryption error:', e);
+      // Fallback: return original but mark as decrypt_failed
+      return { ...data, decrypt_failed: true, error: e.message };
+    }
+  }
+  
+  return data;
 }
 // Tab Handling
 function initTabs() {
