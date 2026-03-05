@@ -115,75 +115,81 @@ class APIDecryption {
 
     // RECURSIVE decryption for nested objects
     async decryptObject(obj) {
-        if (!obj || typeof obj !== 'object') {
-            return obj;
-        }
+  // Handle null/undefined
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
 
-        // Handle arrays
-        if (Array.isArray(obj)) {
-            const result = [];
-            for (const item of obj) {
-                result.push(await this.decryptObject(item));
-            }
-            return result;
-        }
-
-        const result = {};
-
-        for (const [key, value] of Object.entries(obj)) {
-            // Skip metadata fields
-            if (key === 'e' || key === 'v' || key === 'i' || key === 't' || key === 'f') {
-                continue;
-            }
-
-            if (value && typeof value === 'object') {
-                // Check if this is an encrypted field
-                if (value.e === true && value.v && value.i) {
-                    result[key] = await this.decryptField(value);
-                } else {
-                    // Recurse into nested object
-                    result[key] = await this.decryptObject(value);
-                }
-            } else {
-                result[key] = value;
-            }
-        }
-
-        return result;
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    const result = [];
+    for (const item of obj) {
+      result.push(await this.decryptObject(item));
     }
+    return result;
+  }
+
+  const result = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip metadata fields that aren't data containers
+    if (key === 'e' || key === 'v' || key === 'i' || key === 't' || key === 'f') {
+      continue;
+    }
+
+    if (value && typeof value === 'object') {
+      // Check if this is an encrypted field (has e: true, v, i)
+      if (value.e === true && value.v && value.i) {
+        result[key] = await this.decryptField(value);
+      } else {
+        // Recurse into nested object
+        result[key] = await this.decryptObject(value);
+      }
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
 
     async processResponse(apiResponse) {
-        console.log('Processing response:', apiResponse);
-        
-        if (!apiResponse || apiResponse.encrypted !== true) {
-            console.log('Response not encrypted, returning as-is');
-            return apiResponse;
-        }
+  console.log('Processing response:', apiResponse);
+  
+  if (!apiResponse || apiResponse.encrypted !== true) {
+    console.log('Response not encrypted, returning as-is');
+    return apiResponse;
+  }
 
-        try {
-            // Initialize if needed
-            if (!this.masterKey) {
-                const storedKey = localStorage.getItem('api_encryption_key');
-                if (storedKey) {
-                    await this.initialize(storedKey);
-                } else {
-                    throw new Error('No encryption key available');
-                }
-            }
-
-            const decryptedData = await this.decryptObject(apiResponse.data);
-            console.log('Decrypted data:', decryptedData);
-            
-            return {
-                ...apiResponse,
-                data: decryptedData,
-                decrypted: true
-            };
-        } catch (error) {
-            console.error('Process response failed:', error);
-            throw error;
-        }
+  try {
+    // Initialize if needed
+    if (!this.masterKey) {
+      const storedKey = localStorage.getItem('api_encryption_key');
+      if (storedKey) {
+        await this.initialize(storedKey);
+      } else {
+        throw new Error('No encryption key available');
+      }
     }
+
+    // Decrypt the data payload
+    const decryptedData = await this.decryptObject(apiResponse.data);
+    
+    console.log('Decrypted data:', decryptedData);
+    
+    // Return full response structure with decrypted data
+    return {
+      ...apiResponse,
+      data: decryptedData,
+      decrypted: true,
+      encrypted: false  // Mark as no longer encrypted
+    };
+    
+  } catch (error) {
+    console.error('Process response failed:', error);
+    throw error;
+  }
+}
 
     base64ToArrayBuffer(base64) {
         const binaryString = atob(base64);
