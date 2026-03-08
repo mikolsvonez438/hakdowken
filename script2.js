@@ -9,6 +9,7 @@ let isPremium = false;
 let useStreaming = true;
 let allAccounts = [];
 let filteredAccounts = [];
+let isSuperAdmin = false;
 
 // API Configuration
 // const API_URL = "https://prem-eu3.bot-hosting.net:21582";
@@ -230,8 +231,10 @@ function updateUIForUser() {
     return;
   }
 
-  // User is logged in
   document.body.classList.add("logged-in");
+  
+  // Check super admin status
+  isSuperAdmin = currentUser.is_super_admin || currentUser.role === 'super_admin';
 
   // Hide login prompt
   const loginPrompt = document.getElementById("login-prompt");
@@ -244,35 +247,192 @@ function updateUIForUser() {
 
   // Update auth section
   authSection.innerHTML = `
-        <div class="user-menu">
-            <span class="user-email">${currentUser.email}</span>
-            <button class="btn btn-auth" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-        </div>
-    `;
+    <div class="user-menu">
+      <span class="user-email">${currentUser.email}</span>
+      ${isSuperAdmin ? '<span class="super-admin-badge">👑 SUPER ADMIN</span>' : ''}
+      <button class="btn btn-auth" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+  `;
 
   // Update badge
-  userBadge.textContent = isPremium ? "PREMIUM" : "FREE";
-  userBadge.className = isPremium ? "premium-badge premium" : "premium-badge";
+  userBadge.textContent = isSuperAdmin ? "SUPER ADMIN" : (isPremium ? "PREMIUM" : "FREE");
+  userBadge.className = isSuperAdmin ? "premium-badge super-admin" : (isPremium ? "premium-badge premium" : "premium-badge");
   userBadge.style.display = "inline-block";
 
-  // Show/hide premium features
-  if (isPremium) {
+  // Show/hide tabs based on permissions
+  if (isSuperAdmin) {
     accountsTab.style.display = "flex";
-    document.getElementById("token-mode-btn").classList.remove("disabled");
-    document
-      .getElementById("batch-token-mode-btn")
-      .classList.remove("disabled");
-    document.getElementById("pricing-section").style.display = "none";
+    // Add Super Admin tab if not exists
+    if (!document.getElementById('super-admin-tab')) {
+      addSuperAdminTab();
+    }
+  } else if (isPremium) {
+    accountsTab.style.display = "flex";
   } else {
     accountsTab.style.display = "none";
+  }
+
+  // Enable token generation for premium/super admin
+  if (isPremium || isSuperAdmin) {
+    document.getElementById("token-mode-btn").classList.remove("disabled");
+    document.getElementById("batch-token-mode-btn").classList.remove("disabled");
+    document.getElementById("pricing-section").style.display = "none";
+  } else {
     document.getElementById("token-mode-btn").classList.add("disabled");
     document.getElementById("batch-token-mode-btn").classList.add("disabled");
   }
 
-  document.getElementById("user-status").textContent =
-    `Logged in as ${currentUser.email}`;
+  document.getElementById("user-status").textContent = 
+    `Logged in as ${currentUser.email}${isSuperAdmin ? ' (Super Admin)' : ''}`;
+}
+
+function addSuperAdminTab() {
+  const tabsContainer = document.getElementById('main-tabs');
+  const superAdminTab = document.createElement('div');
+  superAdminTab.className = 'tab super-admin-tab';
+  superAdminTab.id = 'super-admin-tab';
+  superAdminTab.dataset.tab = 'super-admin';
+  superAdminTab.innerHTML = '<i class="fas fa-crown"></i> Super Admin';
+  superAdminTab.onclick = () => switchTab('super-admin');
+  
+  // Insert before About tab
+  const aboutTab = document.querySelector('[data-tab="about"]');
+  tabsContainer.insertBefore(superAdminTab, aboutTab);
+  
+  // Add content container
+  const appContent = document.getElementById('app-content');
+  const superAdminContent = document.createElement('div');
+  superAdminContent.className = 'tab-content';
+  superAdminContent.id = 'super-admin-tab-content';
+  superAdminContent.innerHTML = `
+    <div class="super-admin-container">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon"><i class="fas fa-crown"></i></div>
+          <div class="card-title">Super Admin Dashboard</div>
+        </div>
+        
+        <div class="stats-grid" id="admin-stats">
+          <div class="stat-box">
+            <div class="stat-icon"><i class="fas fa-flag"></i></div>
+            <div class="stat-value" id="ph-count">0</div>
+            <div class="stat-label">PH Accounts</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon"><i class="fas fa-lock"></i></div>
+            <div class="stat-value" id="exclusive-count">0</div>
+            <div class="stat-label">Exclusive Accounts</div>
+          </div>
+        </div>
+        
+        <div class="accounts-section">
+          <h3><i class="fas fa-flag"></i> PH Premium Accounts (Minimum 8 Required)</h3>
+          <div class="accounts-list" id="ph-accounts-list">
+            <div class="loading-state">
+              <i class="fas fa-circle-notch fa-spin"></i>
+              <span>Loading...</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="accounts-section">
+          <h3><i class="fas fa-globe"></i> Other Exclusive Accounts</h3>
+          <div class="accounts-list" id="other-exclusive-list">
+            <div class="loading-state">
+              <i class="fas fa-circle-notch fa-spin"></i>
+              <span>Loading...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  appContent.appendChild(superAdminContent);
+}
+
+async function loadExclusiveAccounts() {
+  try {
+    const data = await apiCall('/api/accounts/exclusive');
+    
+    if (data.status === 'success') {
+      // Update stats
+      document.getElementById('ph-count').textContent = data.ph_accounts.count;
+      document.getElementById('exclusive-count').textContent = 
+        data.ph_accounts.count + data.other_exclusive.length;
+      
+      // Render PH accounts with warning if below minimum
+      const phList = document.getElementById('ph-accounts-list');
+      if (data.ph_accounts.count === 0) {
+        phList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><span>No PH accounts found</span></div>';
+      } else {
+        phList.innerHTML = data.ph_accounts.accounts.map(acc => renderAdminAccountItem(acc, !data.ph_minimum_met)).join('');
+      }
+      
+      // Render other exclusive accounts
+      const otherList = document.getElementById('other-exclusive-list');
+      if (data.other_exclusive.length === 0) {
+        otherList.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><span>No other exclusive accounts</span></div>';
+      } else {
+        otherList.innerHTML = data.other_exclusive.map(acc => renderAdminAccountItem(acc)).join('');
+      }
+      
+      // Show warning if PH minimum not met
+      if (!data.ph_minimum_met) {
+        showNotification('Warning: Less than 8 PH premium accounts available!', true);
+      }
+    }
+  } catch (error) {
+    console.error('Error loading exclusive accounts:', error);
+  }
+}
+
+function renderAdminAccountItem(account, highlight = false) {
+  return `
+    <div class="account-item ${highlight ? 'warning' : ''}" onclick="generateTokenForAccount('${account.id}')">
+      <div class="account-icon">
+        <i class="fas fa-user-shield"></i>
+      </div>
+      <div class="account-details">
+        <div class="account-email">${escapeHtml(account.email)}</div>
+        <div class="account-meta">
+          <span class="account-type">${account.subscription_type}</span>
+          <span class="account-country"><i class="fas fa-globe"></i> ${account.country}</span>
+          <span class="account-plan">${account.plan}</span>
+          ${account.reserved_for_super_admin ? '<span class="admin-only-badge">👑 Admin Only</span>' : ''}
+        </div>
+      </div>
+      <div class="account-actions">
+        <button class="btn-icon" onclick="event.stopPropagation(); toggleExclusive('${account.id}', ${!account.exclusive_access})" title="Toggle Exclusive">
+          <i class="fas ${account.exclusive_access ? 'fa-lock' : 'fa-lock-open'}"></i>
+        </button>
+        <div class="account-action">
+          <i class="fas fa-key"></i>
+          <span>Generate</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function toggleExclusive(accountId, makeExclusive) {
+  try {
+    const data = await apiCall(`/api/accounts/${accountId}/set-exclusive`, {
+      method: 'POST',
+      body: JSON.stringify({
+        exclusive_access: makeExclusive,
+        reserved_for_super_admin: makeExclusive
+      })
+    });
+    
+    if (data.status === 'success') {
+      showNotification(`Account ${makeExclusive ? 'marked as exclusive' : 'made public'}`);
+      loadExclusiveAccounts(); // Refresh list
+    }
+  } catch (error) {
+    showNotification('Failed to update account', true);
+  }
 }
 
 async function logout() {
@@ -358,9 +518,6 @@ function initTabs() {
     tab.addEventListener("click", () => {
       const tabId = tab.dataset.tab;
 
-      //console.log("Tab clicked:", tabId); // DEBUG
-
-      // Check auth for protected tabs
       if (
         (tabId === "single" || tabId === "batch" || tabId === "accounts") &&
         !currentUser
@@ -369,9 +526,13 @@ function initTabs() {
         return;
       }
 
-      // Check premium for accounts tab
-      if (tabId === "accounts" && !isPremium) {
+      if (tabId === "accounts" && !isPremium && !isSuperAdmin) {
         showNotification("Premium subscription required", true);
+        return;
+      }
+      
+      if (tabId === "super-admin" && !isSuperAdmin) {
+        showNotification("Super admin access required", true);
         return;
       }
 
@@ -383,24 +544,22 @@ function initTabs() {
 
       tab.classList.add("active");
 
-      // Fix: Properly select the content element
       let selectedContent;
       if (tabId === "accounts") {
         selectedContent = document.getElementById("accounts-tab-content");
+      } else if (tabId === "super-admin") {
+        selectedContent = document.getElementById("super-admin-tab-content");
+        loadExclusiveAccounts();
       } else {
         selectedContent = document.getElementById(`${tabId}-tab`);
       }
-
-      //console.log("Selected content:", selectedContent); // DEBUG
 
       if (selectedContent) {
         selectedContent.style.display = "block";
         setTimeout(() => selectedContent.classList.add("active"), 10);
       }
 
-      // Load accounts if accounts tab
-      if (tabId === "accounts" && isPremium) {
-        //console.log("Loading accounts..."); // DEBUG
+      if (tabId === "accounts" && (isPremium || isSuperAdmin)) {
         loadAccounts();
       }
     });
@@ -1529,47 +1688,134 @@ function handleSaveResults() {
 async function loadAccounts() {
   const accountsList = document.getElementById("accounts-list");
   accountsList.innerHTML = `
-        <div class="loading-state">
-            <i class="fas fa-circle-notch fa-spin"></i>
-            <span>Loading accounts...</span>
-        </div>
-    `;
+    <div class="loading-state">
+      <i class="fas fa-circle-notch fa-spin"></i>
+      <span>Loading accounts...</span>
+    </div>
+  `;
 
   try {
     const data = await apiCall("/api/accounts");
 
-    //console.log("API Response:", data); // DEBUG
-
     if (!data) {
       accountsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span>Failed to load accounts</span>
-                </div>
-            `;
+        <div class="empty-state">
+          <i class="fas fa-exclamation-circle"></i>
+          <span>Failed to load accounts</span>
+        </div>
+      `;
       return;
     }
 
     if (data.status === "success") {
-      displayAccounts(data.accounts);
+      // Filter out exclusive accounts for regular premium users
+      const visibleAccounts = isSuperAdmin ? data.accounts : 
+        data.accounts.filter(acc => !acc.is_exclusive && !acc.reserved_for_super_admin);
+      
+      displayAccounts(visibleAccounts);
+      
+      // Show info if accounts were filtered
+      if (!isSuperAdmin && visibleAccounts.length < data.total_count) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'accounts-info';
+        infoDiv.innerHTML = `
+          <i class="fas fa-info-circle"></i>
+          <span>${data.total_count - visibleAccounts.length} exclusive accounts hidden. 
+          <a href="#" onclick="showUpgradeModal(); return false;">Upgrade to Super Admin</a> for full access.</span>
+        `;
+        accountsList.insertBefore(infoDiv, accountsList.firstChild);
+      }
     } else {
       accountsList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <span>${data.message || "Error loading accounts"}</span>
-                </div>
-            `;
+        <div class="empty-state">
+          <i class="fas fa-exclamation-circle"></i>
+          <span>${data.message || "Error loading accounts"}</span>
+        </div>
+      `;
     }
   } catch (error) {
     console.error("Load accounts error:", error);
     accountsList.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-exclamation-circle"></i>
-                <span>Failed to load accounts</span>
-            </div>
-        `;
+      <div class="empty-state">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>Failed to load accounts</span>
+      </div>
+    `;
   }
 }
+
+const superAdminStyles = document.createElement('style');
+superAdminStyles.textContent = `
+  .super-admin-badge {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    color: #000;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 10px;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  }
+  
+  .super-admin-tab {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 237, 78, 0.2)) !important;
+    border-color: #ffd700 !important;
+  }
+  
+  .super-admin-tab.active::before {
+    background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
+  }
+  
+  .admin-only-badge {
+    background: #ffd700;
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+  
+  .account-item.warning {
+    border: 2px solid var(--accent-red);
+    animation: pulse 2s infinite;
+  }
+  
+  .account-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  
+  .btn-icon {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary);
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  
+  .btn-icon:hover {
+    background: var(--accent-cyan);
+    color: var(--bg-primary);
+  }
+  
+  .accounts-section {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .accounts-section h3 {
+    color: var(--accent-cyan);
+    margin-bottom: var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+`;
+document.head.appendChild(superAdminStyles);
 
 function displayAccounts(accounts) {
   const accountsList = document.getElementById("accounts-list");
@@ -1896,3 +2142,5 @@ window.toggleAuthMode = toggleAuthMode;
 window.logout = logout;
 window.showUpgradeModal = showUpgradeModal;
 window.hideTokenModal = hideTokenModal;
+window.toggleExclusive = toggleExclusive;
+window.loadExclusiveAccounts = loadExclusiveAccounts;
