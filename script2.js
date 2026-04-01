@@ -329,7 +329,7 @@ function addSuperAdminTab() {
           <div class="card-icon"><i class="fas fa-crown"></i></div>
           <div class="card-title">Super Admin Dashboard</div>
         </div>
-        
+       
         <div class="stats-grid" id="admin-stats">
           <div class="stat-box">
             <div class="stat-icon"><i class="fas fa-flag"></i></div>
@@ -342,25 +342,25 @@ function addSuperAdminTab() {
             <div class="stat-label">Exclusive Accounts</div>
           </div>
         </div>
-        
+
+        <!-- NEW EXPORT BUTTON -->
+        <div style="margin: 20px 0; text-align: center;">
+          <button onclick="exportNetflixIds()" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
+            <i class="fas fa-download"></i> Export All Netflix IDs for Re-check
+          </button>
+          <p style="margin-top: 8px; font-size: 0.85rem; color: #888;">
+            Download all netflix_id to re-validate billing dates
+          </p>
+        </div>
+       
         <div class="accounts-section">
           <h3><i class="fas fa-flag"></i> PH Premium Accounts (Minimum 8 Required)</h3>
-          <div class="accounts-list" id="ph-accounts-list">
-            <div class="loading-state">
-              <i class="fas fa-circle-notch fa-spin"></i>
-              <span>Loading...</span>
-            </div>
-          </div>
+          <div class="accounts-list" id="ph-accounts-list">...</div>
         </div>
-        
+       
         <div class="accounts-section">
           <h3><i class="fas fa-globe"></i> Other Exclusive Accounts</h3>
-          <div class="accounts-list" id="other-exclusive-list">
-            <div class="loading-state">
-              <i class="fas fa-circle-notch fa-spin"></i>
-              <span>Loading...</span>
-            </div>
-          </div>
+          <div class="accounts-list" id="other-exclusive-list">...</div>
         </div>
       </div>
     </div>
