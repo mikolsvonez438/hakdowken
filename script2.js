@@ -39,6 +39,16 @@ document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
   updateModeUI();
   updateBatchModeUI();
+
+  setInterval(async () => {
+    if (accessToken && currentUser) {
+      try {
+        await apiCall('/api/auth/me');
+      } catch (e) {
+        console.log("Token refresh check failed", e);
+      }
+    }
+  }, 4 * 60 * 1000); // Check every 4 minutes
 });
 
 window.addEventListener("beforeunload", () => {
