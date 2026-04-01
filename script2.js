@@ -485,6 +485,57 @@ async function logout() {
   location.reload();
 }
 
+async function refreshTokenIfNeeded() {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken || !accessToken) return false;
+  
+  try {
+    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === "success" && data.session) {
+      accessToken = data.session.access_token;
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("refresh_token", data.session.refresh_token);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Token refresh failed:", error);
+    return false;
+  }
+}
+
+// Add a refresh endpoint to your backend
+@app.route('/api/auth/refresh', methods=['POST'])
+def refresh_token():
+    try:
+        data = request.get_json()
+        refresh_token = data.get('refresh_token')
+        
+        if not refresh_token:
+            return jsonify({'status': 'error', 'message': 'No refresh token'}), 400
+        
+        # Use Supabase to refresh
+        auth_response = supabase.auth.refresh_session(refresh_token)
+        
+        return jsonify({
+            'status': 'success',
+            'session': {
+                'access_token': auth_response.session.access_token,
+                'refresh_token': auth_response.session.refresh_token,
+                'expires_at': auth_response.session.expires_at
+            }
+        })
+    except Exception as e:
+        logger.error(f"Refresh error: {e}")
+        return jsonify({'status': 'error', 'message': 'Invalid refresh token'}), 401
+
 // API Helper
 async function apiCall(endpoint, options = {}) {
   const headers = {
