@@ -468,50 +468,44 @@ async function apiCall(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: options.method || "GET",
-    headers: headers,
-    body: options.body,
-    credentials: "include",
-    mode: "cors",
-  });
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: options.method || "GET",
+      headers: headers,
+      body: options.body,
+      credentials: "include",
+      mode: "cors",
+    });
 
-  if (response.status === 401) {
-    showNotification("Session expired. Please login again.", true);
-    logout();
-    return null;
-  }
-
-  const data = await response.json();
-  
-  // Auto-decrypt if encrypted
-  if (data && data.encrypted === true) {
-    try {
-      // Ensure crypto is initialized
-      if (!apiCrypto.masterKey) {
-        const key = localStorage.getItem('api_encryption_key');
-        if (!key) {
-          console.error('No encryption key available');
-          throw new Error('Encryption key not found');
-        }
-        await apiCrypto.initialize(key);
+    // Check for new token in response headers
+    const newToken = response.headers.get('X-New-Token');
+    const newRefreshToken = response.headers.get('X-New-Refresh-Token');
+    
+    if (newToken) {
+      accessToken = newToken;
+      localStorage.setItem("access_token", newToken);
+      if (newRefreshToken) {
+        localStorage.setItem("refresh_token", newRefreshToken);
       }
-      
-      // processResponse returns { status, encrypted, version, data: decrypted, decrypted: true }
-      const decrypted = await apiCrypto.processResponse(data);
-      
-      // Return the decrypted structure (contains .data property with actual payload)
-      return decrypted;
-      
-    } catch (e) {
-      console.error('Decryption error:', e);
-      // Fallback: return original but mark as decrypt_failed
-      return { ...data, decrypt_failed: true, error: e.message };
+      console.log("Token refreshed automatically");
     }
+
+    if (response.status === 401) {
+      showNotification("Session expired. Please login again.", true);
+      logout();
+      return null;
+    }
+
+    const data = await response.json();
+    return data;
+    
+  } catch (error) {
+    console.error("API call error:", error);
+    throw error;
   }
-  
-  return data;
 }
+
+
 // Tab Handling
 function initTabs() {
   const tabs = document.querySelectorAll(".tab");
