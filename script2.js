@@ -48,12 +48,15 @@ window.addEventListener("beforeunload", () => {
 
 function sanitizeDisplay(text) {
   if (!text) return "N/A";
+  // First decode the email
+  const decoded = decodeEmail(text);
+  
   // Mask email: a***@example.com
-  if (text.includes("@")) {
-    const [user, domain] = text.split("@");
+  if (decoded.includes("@")) {
+    const [user, domain] = decoded.split("@");
     return user.charAt(0) + "***@" + domain;
   }
-  return text;
+  return decoded;
 }
 
 // document.addEventListener("DOMContentLoaded", () => {
@@ -1844,14 +1847,14 @@ function displayAccounts(accounts) {
 
 function decodeEmail(email) {
   if (!email) return "N/A";
-  // Decode \x40 to @ and handle other potential encodings
-  const decoded = email
+  // Decode various email encodings
+  return email
     .replace(/\\x40/g, "@")
     .replace(/%40/g, "@")
-    .replace(/&#64;/g, "@");
-
-  // Return sanitized version for display
-  return sanitizeDisplay(decoded);
+    .replace(/&#64;/g, "@")
+    .replace(/&amp;/g, "&")
+    .replace(/\\x2e/g, ".")  // dot encoding
+    .replace(/\\x2d/g, "-"); // dash encoding
 }
 
 function renderAccountsUI() {
