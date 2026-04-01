@@ -128,27 +128,30 @@ async function handleAuth(e) {
                 if (data.encrypted && data.data) {
                     // Initialize crypto first
                     const key = localStorage.getItem('api_encryption_key');
-                    if (key) {
+                    if (key && apiCrypto) {
                         await apiCrypto.initialize(key);
+                        const decrypted = await apiCrypto.decryptObject(data.data);
+                        session = decrypted.session;
+                        user = decrypted.user;
                     } else {
-                        // Fetch key if not in storage
-                        await fetchEncryptionKey();
+                        // Fallback to plaintext if crypto not available
+                        session = data.data.session || data.session;
+                        user = data.data.user || data.user;
                     }
-                    
-                    // Decrypt the data
-                    // const decrypted = await apiCrypto.decryptResponse(data.data);
-                    const decrypted = await apiCrypto.decryptObject(data.data);
-                    session = decrypted.session;
-                    user = decrypted.user;
                 } else {
                     // Plaintext response (fallback)
                     session = data.session;
                     user = data.user;
                 }
                 
+                if (!session || !user) {
+                    throw new Error('Invalid response structure');
+                }
+                
                 accessToken = session.access_token;
                 currentUser = user;
                 isPremium = user.is_premium;
+                isSuperAdmin = user.is_super_admin || user.role === 'super_admin';
                 
                 localStorage.setItem("access_token", accessToken);
                 localStorage.setItem("refresh_token", session.refresh_token);
@@ -161,7 +164,7 @@ async function handleAuth(e) {
                 toggleAuthMode();
             }
         } else {
-            authError.textContent = data.message;
+            authError.textContent = data.message || 'Unknown error';
         }
     } catch (error) {
         console.error("Auth error:", error);
@@ -369,35 +372,50 @@ async function loadExclusiveAccounts() {
   try {
     const data = await apiCall('/api/accounts/exclusive');
     
-    if (data.status === 'success') {
+    // Debug: log what we actually got
+    console.log('Exclusive accounts response:', data);
+    
+    // data should now be the decrypted inner object directly
+    if (data && data.status === 'success') {
       // Update stats
-      document.getElementById('ph-count').textContent = data.ph_accounts.count;
-      document.getElementById('exclusive-count').textContent = 
-        data.ph_accounts.count + data.other_exclusive.length;
+      const phCount = document.getElementById('ph-count');
+      const exclusiveCount = document.getElementById('exclusive-count');
+      
+      if (phCount) phCount.textContent = data.ph_accounts?.count || 0;
+      if (exclusiveCount) exclusiveCount.textContent = 
+        (data.ph_accounts?.count || 0) + (data.other_exclusive?.length || 0);
       
       // Render PH accounts with warning if below minimum
       const phList = document.getElementById('ph-accounts-list');
-      if (data.ph_accounts.count === 0) {
-        phList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><span>No PH accounts found</span></div>';
-      } else {
-        phList.innerHTML = data.ph_accounts.accounts.map(acc => renderAdminAccountItem(acc, !data.ph_minimum_met)).join('');
+      if (phList) {
+        if (!data.ph_accounts?.count) {
+          phList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><span>No PH accounts found</span></div>';
+        } else {
+          phList.innerHTML = data.ph_accounts.accounts.map(acc => renderAdminAccountItem(acc, !data.ph_minimum_met)).join('');
+        }
       }
       
       // Render other exclusive accounts
       const otherList = document.getElementById('other-exclusive-list');
-      if (data.other_exclusive.length === 0) {
-        otherList.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><span>No other exclusive accounts</span></div>';
-      } else {
-        otherList.innerHTML = data.other_exclusive.map(acc => renderAdminAccountItem(acc)).join('');
+      if (otherList) {
+        if (!data.other_exclusive?.length) {
+          otherList.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><span>No other exclusive accounts</span></div>';
+        } else {
+          otherList.innerHTML = data.other_exclusive.map(acc => renderAdminAccountItem(acc)).join('');
+        }
       }
       
       // Show warning if PH minimum not met
       if (!data.ph_minimum_met) {
         showNotification('Warning: Less than 8 PH premium accounts available!', true);
       }
+    } else {
+      console.error('Failed to load exclusive accounts:', data);
+      showNotification(data?.message || 'Failed to load exclusive accounts', true);
     }
   } catch (error) {
     console.error('Error loading exclusive accounts:', error);
+    showNotification('Error loading exclusive accounts', true);
   }
 }
 
@@ -478,43 +496,65 @@ async function apiCall(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: options.method || "GET",
-      headers: headers,
-      body: options.body,
-      credentials: "include",
-      mode: "cors",
-    });
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: options.method || "GET",
+    headers: headers,
+    body: options.body,
+    credentials: "include",
+    mode: "cors",
+  });
 
-    // Check for new token in response headers
-    const newToken = response.headers.get('X-New-Token');
-    const newRefreshToken = response.headers.get('X-New-Refresh-Token');
-    
-    if (newToken) {
-      accessToken = newToken;
-      localStorage.setItem("access_token", newToken);
-      if (newRefreshToken) {
-        localStorage.setItem("refresh_token", newRefreshToken);
-      }
-      console.log("Token refreshed automatically");
+  // Check for new token in response headers
+  const newToken = response.headers.get('X-New-Token');
+  const newRefreshToken = response.headers.get('X-New-Refresh-Token');
+  
+  if (newToken) {
+    accessToken = newToken;
+    localStorage.setItem("access_token", newToken);
+    if (newRefreshToken) {
+      localStorage.setItem("refresh_token", newRefreshToken);
     }
-
-    if (response.status === 401) {
-      showNotification("Session expired. Please login again.", true);
-      logout();
-      return null;
-    }
-
-    const data = await response.json();
-    return data;
-    
-  } catch (error) {
-    console.error("API call error:", error);
-    throw error;
+    console.log("Token refreshed automatically");
   }
-}
 
+  if (response.status === 401) {
+    showNotification("Session expired. Please login again.", true);
+    logout();
+    return null;
+  }
+
+  const data = await response.json();
+  
+  // Handle encrypted responses - return the INNER data, not the wrapper
+  if (data && data.encrypted === true && data.data) {
+    try {
+      // Ensure crypto is initialized
+      if (!apiCrypto || !apiCrypto.masterKey) {
+        const key = localStorage.getItem('api_encryption_key');
+        if (!key) {
+          console.error('No encryption key available');
+          throw new Error('Encryption key not found');
+        }
+        await apiCrypto.initialize(key);
+      }
+      
+      // Decrypt the inner data
+      const decrypted = await apiCrypto.decryptObject(data.data);
+      
+      // Return the DECRYPTED content directly, not the wrapper
+      // The decrypted content should be like: {"status": "success", "ph_accounts": {...}}
+      return decrypted;
+      
+    } catch (e) {
+      console.error('Decryption error:', e);
+      showNotification('Failed to decrypt response', true);
+      return { status: 'error', message: 'Decryption failed' };
+    }
+  }
+  
+  // Not encrypted, return as-is
+  return data;
+}
 
 // Tab Handling
 function initTabs() {
