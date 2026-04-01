@@ -360,24 +360,87 @@ function updateUIForUser() {
     `Logged in as ${currentUser.email}${isSuperAdmin ? ' (Super Admin)' : ''}`;
 }
 
+function switchToTab(tabId) {
+  if ((tabId === "single" || tabId === "batch" || tabId === "accounts") && !currentUser) {
+    showAuthModal();
+    return;
+  }
+
+  if (tabId === "accounts" && !isPremium && !isSuperAdmin) {
+    showNotification("Premium subscription required", true);
+    return;
+  }
+
+  if (tabId === "super-admin" && !isSuperAdmin) {
+    showNotification("Super admin access required", true);
+    return;
+  }
+
+  // Remove active from all tabs and contents
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => {
+    c.classList.remove('active');
+    c.style.display = 'none';
+  });
+
+  // Activate the clicked tab
+  const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
+  if (activeTab) activeTab.classList.add('active');
+
+  // Show the content
+  let selectedContent;
+  if (tabId === "accounts") {
+    selectedContent = document.getElementById("accounts-tab-content");
+  } else if (tabId === "super-admin") {
+    selectedContent = document.getElementById("super-admin-tab-content");
+    // Load exclusive accounts when super admin tab is opened
+    setTimeout(() => loadExclusiveAccounts(), 100);
+  } else {
+    selectedContent = document.getElementById(`${tabId}-tab`);
+  }
+
+  if (selectedContent) {
+    selectedContent.style.display = "block";
+    setTimeout(() => selectedContent.classList.add("active"), 10);
+  }
+
+  // Special actions
+  if (tabId === "accounts" && (isPremium || isSuperAdmin)) {
+    loadAccounts();
+  }
+}
+
 function addSuperAdminTab() {
   const tabsContainer = document.getElementById('main-tabs');
+  
+  // Prevent duplicate tab
+  if (document.getElementById('super-admin-tab')) return;
+
   const superAdminTab = document.createElement('div');
   superAdminTab.className = 'tab super-admin-tab';
   superAdminTab.id = 'super-admin-tab';
   superAdminTab.dataset.tab = 'super-admin';
   superAdminTab.innerHTML = '<i class="fas fa-crown"></i> Super Admin';
-  superAdminTab.onclick = () => switchTab('super-admin');
   
+  // Use the same logic as other tabs instead of calling undefined switchTab
+  superAdminTab.addEventListener('click', () => {
+    switchToTab('super-admin');
+  });
+
   // Insert before About tab
   const aboutTab = document.querySelector('[data-tab="about"]');
-  tabsContainer.insertBefore(superAdminTab, aboutTab);
-  
+  if (aboutTab) {
+    tabsContainer.insertBefore(superAdminTab, aboutTab);
+  } else {
+    tabsContainer.appendChild(superAdminTab);
+  }
+
   // Add content container
   const appContent = document.getElementById('app-content');
   const superAdminContent = document.createElement('div');
   superAdminContent.className = 'tab-content';
   superAdminContent.id = 'super-admin-tab-content';
+  
   superAdminContent.innerHTML = `
     <div class="super-admin-container">
       <div class="card">
@@ -399,28 +462,39 @@ function addSuperAdminTab() {
           </div>
         </div>
 
-        <!-- NEW EXPORT BUTTON -->
-        <div style="margin: 20px 0; text-align: center;">
-          <button onclick="exportNetflixIds()" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
+        <!-- Export Button -->
+        <div style="margin: 25px 0; text-align: center;">
+          <button onclick="exportNetflixIds()" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">
             <i class="fas fa-download"></i> Export All Netflix IDs for Re-check
           </button>
-          <p style="margin-top: 8px; font-size: 0.85rem; color: #888;">
-            Download all netflix_id to re-validate billing dates
+          <p style="margin-top: 10px; font-size: 0.85rem; color: #888;">
+            Download all netflix_id → Upload in Batch Check to update billing info
           </p>
         </div>
        
         <div class="accounts-section">
           <h3><i class="fas fa-flag"></i> PH Premium Accounts (Minimum 8 Required)</h3>
-          <div class="accounts-list" id="ph-accounts-list">...</div>
+          <div class="accounts-list" id="ph-accounts-list">
+            <div class="loading-state">
+              <i class="fas fa-circle-notch fa-spin"></i>
+              <span>Loading...</span>
+            </div>
+          </div>
         </div>
        
         <div class="accounts-section">
           <h3><i class="fas fa-globe"></i> Other Exclusive Accounts</h3>
-          <div class="accounts-list" id="other-exclusive-list">...</div>
+          <div class="accounts-list" id="other-exclusive-list">
+            <div class="loading-state">
+              <i class="fas fa-circle-notch fa-spin"></i>
+              <span>Loading...</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   `;
+
   appContent.appendChild(superAdminContent);
 }
 
@@ -598,56 +672,11 @@ async function apiCall(endpoint, options = {}) {
 // Tab Handling
 function initTabs() {
   const tabs = document.querySelectorAll(".tab");
-  const contents = document.querySelectorAll(".tab-content");
 
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       const tabId = tab.dataset.tab;
-
-      if (
-        (tabId === "single" || tabId === "batch" || tabId === "accounts") &&
-        !currentUser
-      ) {
-        showAuthModal();
-        return;
-      }
-
-      if (tabId === "accounts" && !isPremium && !isSuperAdmin) {
-        showNotification("Premium subscription required", true);
-        return;
-      }
-      
-      if (tabId === "super-admin" && !isSuperAdmin) {
-        showNotification("Super admin access required", true);
-        return;
-      }
-
-      tabs.forEach((t) => t.classList.remove("active"));
-      contents.forEach((c) => {
-        c.classList.remove("active");
-        c.style.display = "none";
-      });
-
-      tab.classList.add("active");
-
-      let selectedContent;
-      if (tabId === "accounts") {
-        selectedContent = document.getElementById("accounts-tab-content");
-      } else if (tabId === "super-admin") {
-        selectedContent = document.getElementById("super-admin-tab-content");
-        loadExclusiveAccounts();
-      } else {
-        selectedContent = document.getElementById(`${tabId}-tab`);
-      }
-
-      if (selectedContent) {
-        selectedContent.style.display = "block";
-        setTimeout(() => selectedContent.classList.add("active"), 10);
-      }
-
-      if (tabId === "accounts" && (isPremium || isSuperAdmin)) {
-        loadAccounts();
-      }
+      switchToTab(tabId);
     });
   });
 }
