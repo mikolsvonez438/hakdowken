@@ -247,24 +247,13 @@ async function exportNetflixIds() {
         return;
     }
 
-    const btn = event.currentTarget; // if called from onclick
+    const btn = event.currentTarget;
     const originalText = btn.innerHTML;
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting all IDs...';
 
     try {
-        const data = await apiCall('/api/export/netflix-ids', {
-            method: 'GET'
-        });
-
-        if (data && data.status === 'error') {
-            showNotification(data.message || 'Export failed', true);
-            return;
-        }
-
-        // If it's a direct file download (Response with blob)
-        // Since it's a direct download from backend, we can create a link
         const response = await fetch(`${API_URL}/api/export/netflix-ids`, {
             method: 'GET',
             headers: {
@@ -273,7 +262,8 @@ async function exportNetflixIds() {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to download');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP ${response.status}`);
         }
 
         const blob = await response.blob();
@@ -286,11 +276,11 @@ async function exportNetflixIds() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
-        showNotification('✅ Netflix IDs exported successfully! Now upload this file in Batch Check.');
+        showNotification(`✅ Exported ${blob.size > 0 ? 'all' : ''} Netflix IDs successfully! Upload this file in Batch Check to re-validate.`, false);
 
     } catch (error) {
         console.error(error);
-        showNotification('Failed to export IDs. Please try again.', true);
+        showNotification('Failed to export IDs: ' + error.message, true);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
