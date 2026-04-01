@@ -2048,7 +2048,7 @@ function displayTokenModal(data) {
   modalBody.innerHTML = `
         <div class="token-result">
             <div class="token-account-info">
-                <h4>${sanitizeDisplay(data.email)}</h4>
+                <h4>${data.email}</h4>
                 <span class="token-type">${data.subscription_type}</span>
             </div>
             
