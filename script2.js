@@ -538,73 +538,28 @@ def refresh_token():
 
 // API Helper
 async function apiCall(endpoint, options = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...options.headers,
-  };
-
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
-  }
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
   const response = await fetch(`${API_URL}${endpoint}`, {
-    method: options.method || "GET",
-    headers: headers,
-    body: options.body,
-    credentials: "include",
-    mode: "cors",
+    ...options,
+    headers,
+    credentials: "include"
   });
 
-  // Check for new token in response headers
+  // Handle new token from header if you add it later
   const newToken = response.headers.get('X-New-Token');
-  const newRefreshToken = response.headers.get('X-New-Refresh-Token');
-  
   if (newToken) {
     accessToken = newToken;
     localStorage.setItem("access_token", newToken);
-    if (newRefreshToken) {
-      localStorage.setItem("refresh_token", newRefreshToken);
-    }
-    console.log("Token refreshed automatically");
   }
 
   if (response.status === 401) {
-    showNotification("Session expired. Please login again.", true);
     logout();
     return null;
   }
 
-  const data = await response.json();
-  
-  // Handle encrypted responses - return the INNER data, not the wrapper
-  if (data && data.encrypted === true && data.data) {
-    try {
-      // Ensure crypto is initialized
-      if (!apiCrypto || !apiCrypto.masterKey) {
-        const key = localStorage.getItem('api_encryption_key');
-        if (!key) {
-          console.error('No encryption key available');
-          throw new Error('Encryption key not found');
-        }
-        await apiCrypto.initialize(key);
-      }
-      
-      // Decrypt the inner data
-      const decrypted = await apiCrypto.decryptObject(data.data);
-      
-      // Return the DECRYPTED content directly, not the wrapper
-      // The decrypted content should be like: {"status": "success", "ph_accounts": {...}}
-      return decrypted;
-      
-    } catch (e) {
-      console.error('Decryption error:', e);
-      showNotification('Failed to decrypt response', true);
-      return { status: 'error', message: 'Decryption failed' };
-    }
-  }
-  
-  // Not encrypted, return as-is
-  return data;
+  return response.json();
 }
 
 // Tab Handling
