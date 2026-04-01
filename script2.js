@@ -1874,14 +1874,13 @@ function displayAccounts(accounts) {
 
 function decodeEmail(email) {
   if (!email) return "N/A";
-  // Decode various email encodings
   return email
-    .replace(/\\x40/g, "@")
-    .replace(/%40/g, "@")
-    .replace(/&#64;/g, "@")
-    .replace(/&amp;/g, "&")
-    .replace(/\\x2e/g, ".")  // dot encoding
-    .replace(/\\x2d/g, "-"); // dash encoding
+    .replace(/\\x40/g, '@')
+    .replace(/%40/g, '@')
+    .replace(/&#64;/g, '@')
+    .replace(/\\x2e/g, '.')
+    .replace(/\\x2d/g, '-')
+    .replace(/\\u0040/g, '@');   // extra safety
 }
 
 function renderAccountsUI() {
