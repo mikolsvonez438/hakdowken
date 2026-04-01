@@ -251,7 +251,7 @@ async function exportNetflixIds() {
     const originalText = btn.innerHTML;
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting all IDs...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating ZIP file...';
 
     try {
         const response = await fetch(`${API_URL}/api/export/netflix-ids`, {
@@ -270,17 +270,17 @@ async function exportNetflixIds() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'netflix_ids_to_recheck.txt';
+        a.download = 'netflix_ids_to_recheck.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
-        showNotification(`✅ Exported ${blob.size > 0 ? 'all' : ''} Netflix IDs successfully! Upload this file in Batch Check to re-validate.`, false);
+        showNotification(`✅ Exported all Netflix IDs as ZIP file! Each ID is in its own .txt file with "NetflixId=..." format.`, false);
 
     } catch (error) {
         console.error(error);
-        showNotification('Failed to export IDs: ' + error.message, true);
+        showNotification('Failed to export ZIP: ' + error.message, true);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
