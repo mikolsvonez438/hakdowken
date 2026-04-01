@@ -241,6 +241,62 @@ function forceShowLogin() {
   document.getElementById("user-status").textContent = "Not logged in";
 }
 
+async function exportNetflixIds() {
+    if (!isSuperAdmin) {
+        showNotification("Super Admin access required", true);
+        return;
+    }
+
+    const btn = event.currentTarget; // if called from onclick
+    const originalText = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+
+    try {
+        const data = await apiCall('/api/export/netflix-ids', {
+            method: 'GET'
+        });
+
+        if (data && data.status === 'error') {
+            showNotification(data.message || 'Export failed', true);
+            return;
+        }
+
+        // If it's a direct file download (Response with blob)
+        // Since it's a direct download from backend, we can create a link
+        const response = await fetch(`${API_URL}/api/export/netflix-ids`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'netflix_ids_to_recheck.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        showNotification('✅ Netflix IDs exported successfully! Now upload this file in Batch Check.');
+
+    } catch (error) {
+        console.error(error);
+        showNotification('Failed to export IDs. Please try again.', true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
 function updateUIForUser() {
   if (!currentUser) {
     forceShowLogin();
