@@ -40,15 +40,18 @@ document.addEventListener("DOMContentLoaded", () => {
   updateModeUI();
   updateBatchModeUI();
 
-  setInterval(async () => {
-    if (accessToken && currentUser) {
-      try {
-        await apiCall('/api/auth/me');
-      } catch (e) {
-        console.log("Token refresh check failed", e);
+  setInterval(
+    async () => {
+      if (accessToken && currentUser) {
+        try {
+          await apiCall("/api/auth/me");
+        } catch (e) {
+          console.log("Token refresh check failed", e);
+        }
       }
-    }
-  }, 4 * 60 * 1000); // Check every 4 minutes
+    },
+    4 * 60 * 1000,
+  ); // Check every 4 minutes
 });
 
 window.addEventListener("beforeunload", () => {
@@ -60,7 +63,7 @@ function sanitizeDisplay(text) {
   if (!text) return "N/A";
   // First decode the email
   const decoded = decodeEmail(text);
-  
+
   // Mask email: a***@example.com
   if (decoded.includes("@")) {
     const [user, domain] = decoded.split("@");
@@ -102,77 +105,78 @@ function toggleAuthMode() {
 }
 
 async function handleAuth(e) {
-    e.preventDefault();
-    const email = document.getElementById("auth-email").value;
-    const password = document.getElementById("auth-password").value;
-    const submitBtn = document.getElementById("auth-submit");
+  e.preventDefault();
+  const email = document.getElementById("auth-email").value;
+  const password = document.getElementById("auth-password").value;
+  const submitBtn = document.getElementById("auth-submit");
 
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
+  submitBtn.disabled = true;
+  submitBtn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i> Processing...';
 
-    try {
-        const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
-        const response = await fetch(`${API_URL}${endpoint}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-        });
+  try {
+    const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-        const data = await response.json();
+    const data = await response.json();
 
-        if (data.status === "success") {
-            if (isLoginMode) {
-                let session, user;
-                
-                // Handle encrypted response
-                if (data.encrypted && data.data) {
-                    // Initialize crypto first
-                    const key = localStorage.getItem('api_encryption_key');
-                    if (key && apiCrypto) {
-                        await apiCrypto.initialize(key);
-                        const decrypted = await apiCrypto.decryptObject(data.data);
-                        session = decrypted.session;
-                        user = decrypted.user;
-                    } else {
-                        // Fallback to plaintext if crypto not available
-                        session = data.data.session || data.session;
-                        user = data.data.user || data.user;
-                    }
-                } else {
-                    // Plaintext response (fallback)
-                    session = data.session;
-                    user = data.user;
-                }
-                
-                if (!session || !user) {
-                    throw new Error('Invalid response structure');
-                }
-                
-                accessToken = session.access_token;
-                currentUser = user;
-                isPremium = user.is_premium;
-                isSuperAdmin = user.is_super_admin || user.role === 'super_admin';
-                
-                localStorage.setItem("access_token", accessToken);
-                localStorage.setItem("refresh_token", session.refresh_token);
-                
-                updateUIForUser();
-                hideAuthModal();
-                showNotification("Login successful!");
-            } else {
-                showNotification("Account created! Please login.");
-                toggleAuthMode();
-            }
+    if (data.status === "success") {
+      if (isLoginMode) {
+        let session, user;
+
+        // Handle encrypted response
+        if (data.encrypted && data.data) {
+          // Initialize crypto first
+          const key = localStorage.getItem("api_encryption_key");
+          if (key && apiCrypto) {
+            await apiCrypto.initialize(key);
+            const decrypted = await apiCrypto.decryptObject(data.data);
+            session = decrypted.session;
+            user = decrypted.user;
+          } else {
+            // Fallback to plaintext if crypto not available
+            session = data.data.session || data.session;
+            user = data.data.user || data.user;
+          }
         } else {
-            authError.textContent = data.message || 'Unknown error';
+          // Plaintext response (fallback)
+          session = data.session;
+          user = data.user;
         }
-    } catch (error) {
-        console.error("Auth error:", error);
-        authError.textContent = "Network error. Please try again.";
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
+
+        if (!session || !user) {
+          throw new Error("Invalid response structure");
+        }
+
+        accessToken = session.access_token;
+        currentUser = user;
+        isPremium = user.is_premium;
+        isSuperAdmin = user.is_super_admin || user.role === "super_admin";
+
+        localStorage.setItem("access_token", accessToken);
+        localStorage.setItem("refresh_token", session.refresh_token);
+
+        updateUIForUser();
+        hideAuthModal();
+        showNotification("Login successful!");
+      } else {
+        showNotification("Account created! Please login.");
+        toggleAuthMode();
+      }
+    } else {
+      authError.textContent = data.message || "Unknown error";
     }
+  } catch (error) {
+    console.error("Auth error:", error);
+    authError.textContent = "Network error. Please try again.";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> ${isLoginMode ? "Login" : "Sign Up"}`;
+  }
 }
 
 async function checkSession() {
@@ -242,49 +246,51 @@ function forceShowLogin() {
 }
 
 async function exportNetflixIds() {
-    if (!isSuperAdmin) {
-        showNotification("Super Admin access required", true);
-        return;
+  if (!isSuperAdmin) {
+    showNotification("Super Admin access required", true);
+    return;
+  }
+
+  const btn = event.currentTarget;
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating ZIP file...';
+
+  try {
+    const response = await fetch(`${API_URL}/api/export/netflix-ids`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
     }
 
-    const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "netflix_ids_to_recheck.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating ZIP file...';
-
-    try {
-        const response = await fetch(`${API_URL}/api/export/netflix-ids`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `HTTP ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'netflix_ids_to_recheck.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        showNotification(`✅ Exported all Netflix IDs as ZIP file! Each ID is in its own .txt file with "NetflixId=..." format.`, false);
-
-    } catch (error) {
-        console.error(error);
-        showNotification('Failed to export ZIP: ' + error.message, true);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
+    showNotification(
+      `✅ Exported all Netflix IDs as ZIP file! Each ID is in its own .txt file with "NetflixId=..." format.`,
+      false,
+    );
+  } catch (error) {
+    console.error(error);
+    showNotification("Failed to export ZIP: " + error.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
 }
 
 function updateUIForUser() {
@@ -294,9 +300,10 @@ function updateUIForUser() {
   }
 
   document.body.classList.add("logged-in");
-  
+
   // Check super admin status
-  isSuperAdmin = currentUser.is_super_admin || currentUser.role === 'super_admin';
+  isSuperAdmin =
+    currentUser.is_super_admin || currentUser.role === "super_admin";
 
   // Hide login prompt
   const loginPrompt = document.getElementById("login-prompt");
@@ -311,7 +318,7 @@ function updateUIForUser() {
   authSection.innerHTML = `
     <div class="user-menu">
       <span class="user-email">${currentUser.email}</span>
-      ${isSuperAdmin ? '<span class="super-admin-badge">👑 SUPER ADMIN</span>' : ''}
+      ${isSuperAdmin ? '<span class="super-admin-badge">👑 SUPER ADMIN</span>' : ""}
       <button class="btn btn-auth" onclick="logout()">
         <i class="fas fa-sign-out-alt"></i> Logout
       </button>
@@ -319,15 +326,23 @@ function updateUIForUser() {
   `;
 
   // Update badge
-  userBadge.textContent = isSuperAdmin ? "SUPER ADMIN" : (isPremium ? "PREMIUM" : "FREE");
-  userBadge.className = isSuperAdmin ? "premium-badge super-admin" : (isPremium ? "premium-badge premium" : "premium-badge");
+  userBadge.textContent = isSuperAdmin
+    ? "SUPER ADMIN"
+    : isPremium
+      ? "PREMIUM"
+      : "FREE";
+  userBadge.className = isSuperAdmin
+    ? "premium-badge super-admin"
+    : isPremium
+      ? "premium-badge premium"
+      : "premium-badge";
   userBadge.style.display = "inline-block";
 
   // Show/hide tabs based on permissions
   if (isSuperAdmin) {
     accountsTab.style.display = "flex";
     // Add Super Admin tab if not exists
-    if (!document.getElementById('super-admin-tab')) {
+    if (!document.getElementById("super-admin-tab")) {
       addSuperAdminTab();
     }
   } else if (isPremium) {
@@ -339,19 +354,24 @@ function updateUIForUser() {
   // Enable token generation for premium/super admin
   if (isPremium || isSuperAdmin) {
     document.getElementById("token-mode-btn").classList.remove("disabled");
-    document.getElementById("batch-token-mode-btn").classList.remove("disabled");
+    document
+      .getElementById("batch-token-mode-btn")
+      .classList.remove("disabled");
     document.getElementById("pricing-section").style.display = "none";
   } else {
     document.getElementById("token-mode-btn").classList.add("disabled");
     document.getElementById("batch-token-mode-btn").classList.add("disabled");
   }
 
-  document.getElementById("user-status").textContent = 
-    `Logged in as ${currentUser.email}${isSuperAdmin ? ' (Super Admin)' : ''}`;
+  document.getElementById("user-status").textContent =
+    `Logged in as ${currentUser.email}${isSuperAdmin ? " (Super Admin)" : ""}`;
 }
 
 function switchToTab(tabId) {
-  if ((tabId === "single" || tabId === "batch" || tabId === "accounts") && !currentUser) {
+  if (
+    (tabId === "single" || tabId === "batch" || tabId === "accounts") &&
+    !currentUser
+  ) {
     showAuthModal();
     return;
   }
@@ -367,15 +387,17 @@ function switchToTab(tabId) {
   }
 
   // Remove active from all tabs and contents
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => {
-    c.classList.remove('active');
-    c.style.display = 'none';
+  document
+    .querySelectorAll(".tab")
+    .forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach((c) => {
+    c.classList.remove("active");
+    c.style.display = "none";
   });
 
   // Activate the clicked tab
   const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
-  if (activeTab) activeTab.classList.add('active');
+  if (activeTab) activeTab.classList.add("active");
 
   // Show the content
   let selectedContent;
@@ -401,23 +423,20 @@ function switchToTab(tabId) {
 }
 
 function addSuperAdminTab() {
-  const tabsContainer = document.getElementById('main-tabs');
-  
-  // Prevent duplicate tab
-  if (document.getElementById('super-admin-tab')) return;
+  const tabsContainer = document.getElementById("main-tabs");
 
-  const superAdminTab = document.createElement('div');
-  superAdminTab.className = 'tab super-admin-tab';
-  superAdminTab.id = 'super-admin-tab';
-  superAdminTab.dataset.tab = 'super-admin';
+  if (document.getElementById("super-admin-tab")) return;
+
+  const superAdminTab = document.createElement("div");
+  superAdminTab.className = "tab super-admin-tab";
+  superAdminTab.id = "super-admin-tab";
+  superAdminTab.dataset.tab = "super-admin";
   superAdminTab.innerHTML = '<i class="fas fa-crown"></i> Super Admin';
-  
-  // Use the same logic as other tabs instead of calling undefined switchTab
-  superAdminTab.addEventListener('click', () => {
-    switchToTab('super-admin');
+
+  superAdminTab.addEventListener("click", () => {
+    switchToTab("super-admin");
   });
 
-  // Insert before About tab
   const aboutTab = document.querySelector('[data-tab="about"]');
   if (aboutTab) {
     tabsContainer.insertBefore(superAdminTab, aboutTab);
@@ -425,12 +444,11 @@ function addSuperAdminTab() {
     tabsContainer.appendChild(superAdminTab);
   }
 
-  // Add content container
-  const appContent = document.getElementById('app-content');
-  const superAdminContent = document.createElement('div');
-  superAdminContent.className = 'tab-content';
-  superAdminContent.id = 'super-admin-tab-content';
-  
+  const appContent = document.getElementById("app-content");
+  const superAdminContent = document.createElement("div");
+  superAdminContent.className = "tab-content";
+  superAdminContent.id = "super-admin-tab-content";
+
   superAdminContent.innerHTML = `
     <div class="super-admin-container">
       <div class="card">
@@ -439,22 +457,79 @@ function addSuperAdminTab() {
           <div class="card-title">Super Admin Dashboard</div>
         </div>
        
+        <!-- Live Stats Grid -->
         <div class="stats-grid" id="admin-stats">
-          <div class="stat-box">
-            <div class="stat-icon"><i class="fas fa-flag"></i></div>
-            <div class="stat-value" id="ph-count">0</div>
+          <div class="stat-box total">
+            <div class="stat-icon"><i class="fas fa-database"></i></div>
+            <div class="stat-value" id="stat-total">-</div>
+            <div class="stat-label">Total Accounts</div>
+          </div>
+          <div class="stat-box valid">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-value" id="stat-active">-</div>
+            <div class="stat-label">Active</div>
+          </div>
+          <div class="stat-box invalid">
+            <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+            <div class="stat-value" id="stat-inactive">-</div>
+            <div class="stat-label">Inactive</div>
+          </div>
+          <div class="stat-box" style="border-color: rgba(255,159,28,0.3)">
+            <div class="stat-icon" style="background: rgba(255,159,28,0.1); color: var(--accent-orange)"><i class="fas fa-flag"></i></div>
+            <div class="stat-value" id="stat-ph" style="color: var(--accent-orange)">-</div>
             <div class="stat-label">PH Accounts</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-icon"><i class="fas fa-lock"></i></div>
-            <div class="stat-value" id="exclusive-count">0</div>
-            <div class="stat-label">Exclusive Accounts</div>
+          <div class="stat-box" style="border-color: rgba(157,78,221,0.3)">
+            <div class="stat-icon" style="background: rgba(157,78,221,0.1); color: var(--accent-purple)"><i class="fas fa-crown"></i></div>
+            <div class="stat-value" id="stat-premium" style="color: var(--accent-purple)">-</div>
+            <div class="stat-label">Premium</div>
+          </div>
+          <div class="stat-box" style="border-color: rgba(230,57,70,0.3)">
+            <div class="stat-icon" style="background: rgba(230,57,70,0.1); color: var(--accent-red)"><i class="fas fa-clock"></i></div>
+            <div class="stat-value" id="stat-needs-recheck" style="color: var(--accent-red)">-</div>
+            <div class="stat-label">Need Recheck</div>
+          </div>
+        </div>
+
+        <!-- Bulk Recheck Section -->
+        <div class="recheck-section" style="margin: 30px 0; padding: 25px; background: rgba(0,0,0,0.2); border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.05);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+            <div>
+              <h3 style="color: var(--accent-cyan); margin-bottom: 5px;"><i class="fas fa-sync-alt"></i> Bulk Account Recheck</h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem;">Recheck all active accounts, update metadata, and remove expired ones automatically.</p>
+            </div>
+            <button onclick="startBulkRecheck()" id="bulk-recheck-btn" class="btn btn-primary btn-glow" style="width: auto; padding: 14px 32px;">
+              <i class="fas fa-sync-alt"></i> Start Bulk Recheck
+            </button>
+          </div>
+          
+          <!-- Progress Container -->
+          <div id="recheck-progress-container" style="display: none;">
+            <div class="progress-bar" style="margin-bottom: 15px;">
+              <div class="progress" id="recheck-progress" style="width: 0%"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div id="recheck-status" style="color: var(--text-secondary); font-size: 0.9rem;">
+                <i class="fas fa-circle-notch fa-spin"></i> Initializing...
+              </div>
+              <div id="recheck-stats" style="color: var(--text-muted); font-size: 0.85rem;">
+                0 / 0 checked
+              </div>
+            </div>
+          </div>
+          
+          <!-- Results Log -->
+          <div id="recheck-results" style="margin-top: 20px; max-height: 300px; overflow-y: auto; display: none;">
+            <div class="results-list-header" style="margin-bottom: 10px;">
+              <span style="color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Live Results</span>
+            </div>
+            <div id="recheck-results-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
         </div>
 
         <!-- Export Button -->
         <div style="margin: 25px 0; text-align: center;">
-          <button onclick="exportNetflixIds()" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem;">
+          <button onclick="exportNetflixIds()" class="btn btn-primary" style="padding: 14px 28px; font-size: 1.05rem; width: auto; display: inline-flex;">
             <i class="fas fa-download"></i> Export All Netflix IDs for Re-check
           </button>
           <p style="margin-top: 10px; font-size: 0.85rem; color: #888;">
@@ -486,62 +561,227 @@ function addSuperAdminTab() {
   `;
 
   appContent.appendChild(superAdminContent);
+
+  // Load stats when tab is created
+  setTimeout(() => loadAdminStats(), 100);
+}
+
+// Add these new functions:
+
+async function loadAdminStats() {
+  try {
+    const data = await apiCall("/api/admin/account-stats");
+    if (data && data.status === "success") {
+      const s = data.stats;
+      document.getElementById("stat-total").textContent = s.total;
+      document.getElementById("stat-active").textContent = s.active;
+      document.getElementById("stat-inactive").textContent = s.inactive;
+      document.getElementById("stat-ph").textContent = s.ph_accounts;
+      document.getElementById("stat-premium").textContent = s.premium_accounts;
+      document.getElementById("stat-needs-recheck").textContent =
+        s.needs_recheck;
+    }
+  } catch (e) {
+    console.error("Failed to load stats:", e);
+  }
+}
+
+async function startBulkRecheck() {
+  const btn = document.getElementById("bulk-recheck-btn");
+  const progressContainer = document.getElementById(
+    "recheck-progress-container",
+  );
+  const progressBar = document.getElementById("recheck-progress");
+  const statusEl = document.getElementById("recheck-status");
+  const statsEl = document.getElementById("recheck-stats");
+  const resultsContainer = document.getElementById("recheck-results");
+  const resultsList = document.getElementById("recheck-results-list");
+
+  // Reset UI
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Running...';
+  progressContainer.style.display = "block";
+  resultsContainer.style.display = "block";
+  resultsList.innerHTML = "";
+  progressBar.style.width = "0%";
+
+  let validCount = 0;
+  let invalidCount = 0;
+
+  try {
+    const response = await fetch(`${API_URL}/api/admin/bulk-recheck`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "text/event-stream",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === "progress") {
+              progressBar.style.width = `${data.percent}%`;
+              statusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Checking ${data.email}`;
+              statsEl.textContent = `${data.current} / ${data.total}`;
+            } else if (data.type === "result") {
+              const item = document.createElement("div");
+              item.style.cssText =
+                "display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; animation: slideIn 0.3s ease;";
+
+              if (data.status === "valid") {
+                validCount++;
+                item.style.background = "rgba(6,255,165,0.1)";
+                item.style.border = "1px solid rgba(6,255,165,0.2)";
+                item.innerHTML = `
+                  <i class="fas fa-check-circle" style="color: var(--accent-green)"></i>
+                  <span style="flex: 1; color: var(--text-primary)">${escapeHtml(data.email)}</span>
+                  <span style="color: var(--accent-green)">${data.plan} • ${data.country}</span>
+                `;
+              } else if (data.status === "invalid") {
+                invalidCount++;
+                item.style.background = "rgba(230,57,70,0.1)";
+                item.style.border = "1px solid rgba(230,57,70,0.2)";
+                item.innerHTML = `
+                  <i class="fas fa-trash-alt" style="color: var(--accent-red)"></i>
+                  <span style="flex: 1; color: var(--text-primary); text-decoration: line-through; opacity: 0.6">${escapeHtml(data.email)}</span>
+                  <span style="color: var(--accent-red)">Removed • ${data.reason}</span>
+                `;
+              } else {
+                item.style.background = "rgba(255,159,28,0.1)";
+                item.style.border = "1px solid rgba(255,159,28,0.2)";
+                item.innerHTML = `
+                  <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange)"></i>
+                  <span style="flex: 1; color: var(--text-primary)">${escapeHtml(data.email)}</span>
+                  <span style="color: var(--accent-orange)">Error</span>
+                `;
+              }
+
+              resultsList.insertBefore(item, resultsList.firstChild);
+
+              // Keep only last 50 results in DOM for performance
+              while (resultsList.children.length > 50) {
+                resultsList.removeChild(resultsList.lastChild);
+              }
+            } else if (data.type === "complete") {
+              progressBar.style.width = "100%";
+              statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--accent-green)"></i> ${data.message}`;
+              statsEl.textContent = `${data.checked} checked • ${data.valid} valid • ${data.invalid} removed`;
+
+              showNotification(
+                `✅ Recheck complete! ${data.valid} valid, ${data.invalid} removed`,
+              );
+
+              // Refresh stats and account lists
+              loadAdminStats();
+              loadExclusiveAccounts();
+            } else if (data.type === "error") {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            console.error("SSE parse error:", e);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Bulk recheck error:", error);
+    statusEl.innerHTML = `<i class="fas fa-times-circle" style="color: var(--accent-red)"></i> Failed: ${error.message}`;
+    showNotification("Bulk recheck failed: " + error.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sync-alt"></i> Start Bulk Recheck';
+    // Refresh stats one more time
+    loadAdminStats();
+  }
 }
 
 async function loadExclusiveAccounts() {
   try {
-    const data = await apiCall('/api/accounts/exclusive');
-    
+    const data = await apiCall("/api/accounts/exclusive");
+
     // Debug: log what we actually got
-    console.log('Exclusive accounts response:', data);
-    
+    console.log("Exclusive accounts response:", data);
+
     // data should now be the decrypted inner object directly
-    if (data && data.status === 'success') {
+    if (data && data.status === "success") {
       // Update stats
-      const phCount = document.getElementById('ph-count');
-      const exclusiveCount = document.getElementById('exclusive-count');
-      
+      const phCount = document.getElementById("ph-count");
+      const exclusiveCount = document.getElementById("exclusive-count");
+
       if (phCount) phCount.textContent = data.ph_accounts?.count || 0;
-      if (exclusiveCount) exclusiveCount.textContent = 
-        (data.ph_accounts?.count || 0) + (data.other_exclusive?.length || 0);
-      
+      if (exclusiveCount)
+        exclusiveCount.textContent =
+          (data.ph_accounts?.count || 0) + (data.other_exclusive?.length || 0);
+
       // Render PH accounts with warning if below minimum
-      const phList = document.getElementById('ph-accounts-list');
+      const phList = document.getElementById("ph-accounts-list");
       if (phList) {
         if (!data.ph_accounts?.count) {
-          phList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><span>No PH accounts found</span></div>';
+          phList.innerHTML =
+            '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><span>No PH accounts found</span></div>';
         } else {
-          phList.innerHTML = data.ph_accounts.accounts.map(acc => renderAdminAccountItem(acc, !data.ph_minimum_met)).join('');
+          phList.innerHTML = data.ph_accounts.accounts
+            .map((acc) => renderAdminAccountItem(acc, !data.ph_minimum_met))
+            .join("");
         }
       }
-      
+
       // Render other exclusive accounts
-      const otherList = document.getElementById('other-exclusive-list');
+      const otherList = document.getElementById("other-exclusive-list");
       if (otherList) {
         if (!data.other_exclusive?.length) {
-          otherList.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><span>No other exclusive accounts</span></div>';
+          otherList.innerHTML =
+            '<div class="empty-state"><i class="fas fa-inbox"></i><span>No other exclusive accounts</span></div>';
         } else {
-          otherList.innerHTML = data.other_exclusive.map(acc => renderAdminAccountItem(acc)).join('');
+          otherList.innerHTML = data.other_exclusive
+            .map((acc) => renderAdminAccountItem(acc))
+            .join("");
         }
       }
-      
+
       // Show warning if PH minimum not met
       if (!data.ph_minimum_met) {
-        showNotification('Warning: Less than 8 PH premium accounts available!', true);
+        showNotification(
+          "Warning: Less than 8 PH premium accounts available!",
+          true,
+        );
       }
     } else {
-      console.error('Failed to load exclusive accounts:', data);
-      showNotification(data?.message || 'Failed to load exclusive accounts', true);
+      console.error("Failed to load exclusive accounts:", data);
+      showNotification(
+        data?.message || "Failed to load exclusive accounts",
+        true,
+      );
     }
   } catch (error) {
-    console.error('Error loading exclusive accounts:', error);
-    showNotification('Error loading exclusive accounts', true);
+    console.error("Error loading exclusive accounts:", error);
+    showNotification("Error loading exclusive accounts", true);
   }
+  loadAdminStats();
 }
 
 function renderAdminAccountItem(account, highlight = false) {
   return `
-    <div class="account-item ${highlight ? 'warning' : ''}" onclick="generateTokenForAccount('${account.id}')">
+    <div class="account-item ${highlight ? "warning" : ""}" onclick="generateTokenForAccount('${account.id}')">
       <div class="account-icon">
         <i class="fas fa-user-shield"></i>
       </div>
@@ -551,12 +791,12 @@ function renderAdminAccountItem(account, highlight = false) {
           <span class="account-type">${account.subscription_type}</span>
           <span class="account-country"><i class="fas fa-globe"></i> ${account.country}</span>
           <span class="account-plan">${account.plan}</span>
-          ${account.reserved_for_super_admin ? '<span class="admin-only-badge">👑 Admin Only</span>' : ''}
+          ${account.reserved_for_super_admin ? '<span class="admin-only-badge">👑 Admin Only</span>' : ""}
         </div>
       </div>
       <div class="account-actions">
         <button class="btn-icon" onclick="event.stopPropagation(); toggleExclusive('${account.id}', ${!account.exclusive_access})" title="Toggle Exclusive">
-          <i class="fas ${account.exclusive_access ? 'fa-lock' : 'fa-lock-open'}"></i>
+          <i class="fas ${account.exclusive_access ? "fa-lock" : "fa-lock-open"}"></i>
         </button>
         <div class="account-action">
           <i class="fas fa-key"></i>
@@ -570,19 +810,21 @@ function renderAdminAccountItem(account, highlight = false) {
 async function toggleExclusive(accountId, makeExclusive) {
   try {
     const data = await apiCall(`/api/accounts/${accountId}/set-exclusive`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         exclusive_access: makeExclusive,
-        reserved_for_super_admin: makeExclusive
-      })
+        reserved_for_super_admin: makeExclusive,
+      }),
     });
-    
-    if (data.status === 'success') {
-      showNotification(`Account ${makeExclusive ? 'marked as exclusive' : 'made public'}`);
+
+    if (data.status === "success") {
+      showNotification(
+        `Account ${makeExclusive ? "marked as exclusive" : "made public"}`,
+      );
       loadExclusiveAccounts(); // Refresh list
     }
   } catch (error) {
-    showNotification('Failed to update account', true);
+    showNotification("Failed to update account", true);
   }
 }
 
@@ -608,16 +850,16 @@ async function logout() {
 async function refreshTokenIfNeeded() {
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken || !accessToken) return false;
-  
+
   try {
     const response = await fetch(`${API_URL}/api/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
-    
+
     const data = await response.json();
-    
+
     if (data.status === "success" && data.session) {
       accessToken = data.session.access_token;
       localStorage.setItem("access_token", accessToken);
@@ -631,8 +873,6 @@ async function refreshTokenIfNeeded() {
   }
 }
 
-
-
 // API Helper
 async function apiCall(endpoint, options = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -641,11 +881,11 @@ async function apiCall(endpoint, options = {}) {
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: "include"
+    credentials: "include",
   });
 
   // Handle new token from header if you add it later
-  const newToken = response.headers.get('X-New-Token');
+  const newToken = response.headers.get("X-New-Token");
   if (newToken) {
     accessToken = newToken;
     localStorage.setItem("access_token", newToken);
@@ -1063,122 +1303,122 @@ function displayResults(data) {
   document.getElementById("results").innerHTML = html;
   document.getElementById("copy-results-btn").disabled = false;
 }
-function displayResults(data) {
-  const resultData = data.data;
-  const expTime = resultData.expires
-    ? new Date(resultData.expires * 1000).toLocaleString()
-    : "Unknown";
+// function displayResults(data) {
+//   const resultData = data.data;
+//   const expTime = resultData.expires
+//     ? new Date(resultData.expires * 1000).toLocaleString()
+//     : "Unknown";
 
-  let html = `
-        <div class="result-item">
-            <div class="result-header">
-                <div class="result-badge valid"><i class="fas fa-check"></i> VALID</div>
-                ${resultData.is_premium ? '<div class="result-badge premium"><i class="fas fa-crown"></i> PREMIUM</div>' : ""}
-                <div class="result-badge country"><i class="fas fa-globe"></i> ${resultData.country}</div>
-            </div>
-            
-            <div class="account-info">
-                <div class="info-row">
-                    <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
-                    <span class="info-value">${decodeEmail(resultData.email)}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label"><i class="fas fa-globe-americas"></i> Country</span>
-                    <span class="info-value">${resultData.country}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label"><i class="fas fa-tag"></i> Plan</span>
-                    <span class="info-value">${resultData.plan}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label"><i class="fas fa-gem"></i> Type</span>
-                    <span class="info-value">${resultData.subscription_type}</span>
-                </div>
-            </div>
-        </div>
-    `;
+//   let html = `
+//         <div class="result-item">
+//             <div class="result-header">
+//                 <div class="result-badge valid"><i class="fas fa-check"></i> VALID</div>
+//                 ${resultData.is_premium ? '<div class="result-badge premium"><i class="fas fa-crown"></i> PREMIUM</div>' : ""}
+//                 <div class="result-badge country"><i class="fas fa-globe"></i> ${resultData.country}</div>
+//             </div>
 
-  if (resultData.token && resultData.login_urls) {
-    html += `
-            <div class="result-item">
-                <div class="device-links">
-                    <div class="device-links-title">
-                        <i class="fas fa-external-link-alt"></i> Quick Access Links
-                    </div>
-                    
-                    <div class="device-grid">
-                        <div class="device-card phone">
-                            <div class="device-header">
-                                <div class="device-icon"><i class="fas fa-mobile-alt"></i></div>
-                                <div class="device-name">Mobile / Phone</div>
-                            </div>
-                            <a href="${resultData.login_urls.phone}" target="_blank" class="device-link">
-                                <i class="fas fa-link"></i> Open Netflix on Mobile
-                            </a>
-                            <div class="device-actions">
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.phone}', 'Mobile link copied!')">
-                                    <i class="fas fa-copy"></i> Copy Link
-                                </button>
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
-                                    <i class="fas fa-key"></i> Copy Token
-                                </button>
-                            </div>
-                        </div>
+//             <div class="account-info">
+//                 <div class="info-row">
+//                     <span class="info-label"><i class="fas fa-envelope"></i> Email</span>
+//                     <span class="info-value">${decodeEmail(resultData.email)}</span>
+//                 </div>
+//                 <div class="info-row">
+//                     <span class="info-label"><i class="fas fa-globe-americas"></i> Country</span>
+//                     <span class="info-value">${resultData.country}</span>
+//                 </div>
+//                 <div class="info-row">
+//                     <span class="info-label"><i class="fas fa-tag"></i> Plan</span>
+//                     <span class="info-value">${resultData.plan}</span>
+//                 </div>
+//                 <div class="info-row">
+//                     <span class="info-label"><i class="fas fa-gem"></i> Type</span>
+//                     <span class="info-value">${resultData.subscription_type}</span>
+//                 </div>
+//             </div>
+//         </div>
+//     `;
 
-                        <div class="device-card tv">
-                            <div class="device-header">
-                                <div class="device-icon"><i class="fas fa-tv"></i></div>
-                                <div class="device-name">Smart TV</div>
-                            </div>
-                            <a href="${resultData.login_urls.tv}" target="_blank" class="device-link">
-                                <i class="fas fa-link"></i> Open Netflix on TV
-                            </a>
-                            <div class="device-actions">
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.tv}', 'TV link copied!')">
-                                    <i class="fas fa-copy"></i> Copy Link
-                                </button>
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
-                                    <i class="fas fa-key"></i> Copy Token
-                                </button>
-                            </div>
-                        </div>
+//   if (resultData.token && resultData.login_urls) {
+//     html += `
+//             <div class="result-item">
+//                 <div class="device-links">
+//                     <div class="device-links-title">
+//                         <i class="fas fa-external-link-alt"></i> Quick Access Links
+//                     </div>
 
-                        <div class="device-card pc">
-                            <div class="device-header">
-                                <div class="device-icon"><i class="fas fa-laptop"></i></div>
-                                <div class="device-name">PC / Laptop</div>
-                            </div>
-                            <a href="${resultData.login_urls.pc}" target="_blank" class="device-link">
-                                <i class="fas fa-link"></i> Open Netflix on PC
-                            </a>
-                            <div class="device-actions">
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.pc}', 'PC link copied!')">
-                                    <i class="fas fa-copy"></i> Copy Link
-                                </button>
-                                <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
-                                    <i class="fas fa-key"></i> Copy Token
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+//                     <div class="device-grid">
+//                         <div class="device-card phone">
+//                             <div class="device-header">
+//                                 <div class="device-icon"><i class="fas fa-mobile-alt"></i></div>
+//                                 <div class="device-name">Mobile / Phone</div>
+//                             </div>
+//                             <a href="${resultData.login_urls.phone}" target="_blank" class="device-link">
+//                                 <i class="fas fa-link"></i> Open Netflix on Mobile
+//                             </a>
+//                             <div class="device-actions">
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.phone}', 'Mobile link copied!')">
+//                                     <i class="fas fa-copy"></i> Copy Link
+//                                 </button>
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+//                                     <i class="fas fa-key"></i> Copy Token
+//                                 </button>
+//                             </div>
+//                         </div>
 
-                <div class="token-section">
-                    <div class="token-header">
-                        <span class="token-label"><i class="fas fa-key"></i> Token Details</span>
-                        <span style="color: var(--text-muted); font-size: 0.85rem;">
-                            <i class="fas fa-clock"></i> Expires: ${expTime}
-                        </span>
-                    </div>
-                    <div class="token-value">${resultData.token}</div>
-                </div>
-            </div>
-        `;
-  }
+//                         <div class="device-card tv">
+//                             <div class="device-header">
+//                                 <div class="device-icon"><i class="fas fa-tv"></i></div>
+//                                 <div class="device-name">Smart TV</div>
+//                             </div>
+//                             <a href="${resultData.login_urls.tv}" target="_blank" class="device-link">
+//                                 <i class="fas fa-link"></i> Open Netflix on TV
+//                             </a>
+//                             <div class="device-actions">
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.tv}', 'TV link copied!')">
+//                                     <i class="fas fa-copy"></i> Copy Link
+//                                 </button>
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+//                                     <i class="fas fa-key"></i> Copy Token
+//                                 </button>
+//                             </div>
+//                         </div>
 
-  document.getElementById("results").innerHTML = html;
-  document.getElementById("copy-results-btn").disabled = false;
-}
+//                         <div class="device-card pc">
+//                             <div class="device-header">
+//                                 <div class="device-icon"><i class="fas fa-laptop"></i></div>
+//                                 <div class="device-name">PC / Laptop</div>
+//                             </div>
+//                             <a href="${resultData.login_urls.pc}" target="_blank" class="device-link">
+//                                 <i class="fas fa-link"></i> Open Netflix on PC
+//                             </a>
+//                             <div class="device-actions">
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.login_urls.pc}', 'PC link copied!')">
+//                                     <i class="fas fa-copy"></i> Copy Link
+//                                 </button>
+//                                 <button class="btn-copy" onclick="copyToClipboard('${resultData.token}', 'Token copied!')">
+//                                     <i class="fas fa-key"></i> Copy Token
+//                                 </button>
+//                             </div>
+//                         </div>
+//                     </div>
+//                 </div>
+
+//                 <div class="token-section">
+//                     <div class="token-header">
+//                         <span class="token-label"><i class="fas fa-key"></i> Token Details</span>
+//                         <span style="color: var(--text-muted); font-size: 0.85rem;">
+//                             <i class="fas fa-clock"></i> Expires: ${expTime}
+//                         </span>
+//                     </div>
+//                     <div class="token-value">${resultData.token}</div>
+//                 </div>
+//             </div>
+//         `;
+//   }
+
+//   document.getElementById("results").innerHTML = html;
+//   document.getElementById("copy-results-btn").disabled = false;
+// }
 
 function displayError(message) {
   document.getElementById("results").innerHTML = `
@@ -1258,141 +1498,150 @@ function updateFileList() {
 }
 
 async function handleProcessBatch() {
-    if (selectedFiles.length === 0) {
-        showNotification("Please select files first", true);
-        return;
-    }
+  if (selectedFiles.length === 0) {
+    showNotification("Please select files first", true);
+    return;
+  }
 
-    batchResultsData = [];
-    const batchResults = document.getElementById("batch-results");
-    batchResults.innerHTML = "";
+  batchResultsData = [];
+  const batchResults = document.getElementById("batch-results");
+  batchResults.innerHTML = "";
 
-    const btn = document.getElementById("process-batch-btn");
-    const progress = document.getElementById("batch-progress");
-    const status = document.getElementById("batch-status");
-    const saveBtn = document.getElementById("save-results-btn");
+  const btn = document.getElementById("process-batch-btn");
+  const progress = document.getElementById("batch-progress");
+  const status = document.getElementById("batch-status");
+  const saveBtn = document.getElementById("save-results-btn");
 
-    btn.disabled = true;
-    saveBtn.disabled = true;
+  btn.disabled = true;
+  saveBtn.disabled = true;
 
-    // Process in chunks of 15 files to stay under 10 second limit
-    const CHUNK_SIZE = 15;
-    const totalChunks = Math.ceil(selectedFiles.length / CHUNK_SIZE);
-    let allResults = [];
-    let validCount = 0;
-    let invalidCount = 0;
+  // Process in chunks of 15 files to stay under 10 second limit
+  const CHUNK_SIZE = 15;
+  const totalChunks = Math.ceil(selectedFiles.length / CHUNK_SIZE);
+  let allResults = [];
+  let validCount = 0;
+  let invalidCount = 0;
 
-    try {
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-            const start = chunkIndex * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, selectedFiles.length);
-            const chunk = selectedFiles.slice(start, end);
-            
-            status.textContent = `Processing chunk ${chunkIndex + 1}/${totalChunks} (${start + 1}-${end} of ${selectedFiles.length})`;
-            
-            const formData = new FormData();
-            chunk.forEach((file) => formData.append("files", file));
-            formData.append("mode", batchMode);
+  try {
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, selectedFiles.length);
+      const chunk = selectedFiles.slice(start, end);
 
-            // Process this chunk with streaming
-            const chunkResults = await processBatchChunk(formData, progress, start, selectedFiles.length);
-            allResults.push(...chunkResults);
-            
-            // Update counts
-            chunkResults.forEach(result => {
-                if (result.status === 'success') {
-                    validCount++;
-                } else {
-                    invalidCount++;
-                }
-            });
-            
-            // Update display after each chunk
-            displayBatchResults(allResults);
-            updateStats(selectedFiles.length, validCount, invalidCount);
-            
-            // Small delay between chunks to prevent overwhelming
-            if (chunkIndex < totalChunks - 1) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
+      status.textContent = `Processing chunk ${chunkIndex + 1}/${totalChunks} (${start + 1}-${end} of ${selectedFiles.length})`;
+
+      const formData = new FormData();
+      chunk.forEach((file) => formData.append("files", file));
+      formData.append("mode", batchMode);
+
+      // Process this chunk with streaming
+      const chunkResults = await processBatchChunk(
+        formData,
+        progress,
+        start,
+        selectedFiles.length,
+      );
+      allResults.push(...chunkResults);
+
+      // Update counts
+      chunkResults.forEach((result) => {
+        if (result.status === "success") {
+          validCount++;
+        } else {
+          invalidCount++;
         }
+      });
 
-        batchResultsData = allResults;
-        progress.style.width = "100%";
-        status.textContent = `Complete - ${validCount} valid, ${invalidCount} invalid`;
-        saveBtn.disabled = false;
-        
-        showNotification(`Processed all ${selectedFiles.length} files!`);
+      // Update display after each chunk
+      displayBatchResults(allResults);
+      updateStats(selectedFiles.length, validCount, invalidCount);
 
-    } catch (error) {
-        console.error("Batch processing error:", error);
-        progress.style.width = "100%";
-        status.textContent = "Failed: " + error.message;
-        showNotification(error.message, true);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
+      // Small delay between chunks to prevent overwhelming
+      if (chunkIndex < totalChunks - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
+
+    batchResultsData = allResults;
+    progress.style.width = "100%";
+    status.textContent = `Complete - ${validCount} valid, ${invalidCount} invalid`;
+    saveBtn.disabled = false;
+
+    showNotification(`Processed all ${selectedFiles.length} files!`);
+  } catch (error) {
+    console.error("Batch processing error:", error);
+    progress.style.width = "100%";
+    status.textContent = "Failed: " + error.message;
+    showNotification(error.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-play"></i><span>${modeDescriptions[batchMode].batchBtnText}</span>`;
+  }
 }
 
-async function processBatchChunk(formData, progressBar, startIndex, totalFiles) {
-    const results = [];
-    
-    const response = await fetch(`${API_URL}/api/batch-check`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "text/event-stream",
-        },
-        body: formData,
-    });
+async function processBatchChunk(
+  formData,
+  progressBar,
+  startIndex,
+  totalFiles,
+) {
+  const results = [];
 
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
+  const response = await fetch(`${API_URL}/api/batch-check`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "text/event-stream",
+    },
+    body: formData,
+  });
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
 
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-        for (const line of lines) {
-            if (line.startsWith("data: ")) {
-                try {
-                    const data = JSON.parse(line.slice(6));
-                    
-                    if (data.type === "progress") {
-                        // Calculate overall progress
-                        const overallCurrent = startIndex + data.current;
-                        const overallPercent = (overallCurrent / totalFiles) * 100;
-                        progressBar.style.width = `${overallPercent}%`;
-                    } else if (data.type === "result") {
-                        results.push(data.result);
-                        
-                        // Add to display immediately
-                        if (data.result.status === 'success') {
-                            addResultToDisplay(data.result, true);
-                        } else {
-                            addResultToDisplay(data.result, false);
-                        }
-                    } else if (data.type === "complete") {
-                        return results;
-                    }
-                } catch (e) {
-                    console.error("Parse error:", e);
-                }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const data = JSON.parse(line.slice(6));
+
+          if (data.type === "progress") {
+            // Calculate overall progress
+            const overallCurrent = startIndex + data.current;
+            const overallPercent = (overallCurrent / totalFiles) * 100;
+            progressBar.style.width = `${overallPercent}%`;
+          } else if (data.type === "result") {
+            results.push(data.result);
+
+            // Add to display immediately
+            if (data.result.status === "success") {
+              addResultToDisplay(data.result, true);
+            } else {
+              addResultToDisplay(data.result, false);
             }
+          } else if (data.type === "complete") {
+            return results;
+          }
+        } catch (e) {
+          console.error("Parse error:", e);
         }
+      }
     }
-    
-    return results;
+  }
+
+  return results;
 }
 async function processBatchRegular(formData, progress, status, btn, saveBtn) {
   // Fallback for browsers that don't support streaming
@@ -1814,15 +2063,18 @@ async function loadAccounts() {
 
     if (data.status === "success") {
       // Filter out exclusive accounts for regular premium users
-      const visibleAccounts = isSuperAdmin ? data.accounts : 
-        data.accounts.filter(acc => !acc.is_exclusive && !acc.reserved_for_super_admin);
-      
+      const visibleAccounts = isSuperAdmin
+        ? data.accounts
+        : data.accounts.filter(
+            (acc) => !acc.is_exclusive && !acc.reserved_for_super_admin,
+          );
+
       displayAccounts(visibleAccounts);
-      
+
       // Show info if accounts were filtered
       if (!isSuperAdmin && visibleAccounts.length < data.total_count) {
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'accounts-info';
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "accounts-info";
         infoDiv.innerHTML = `
           <i class="fas fa-info-circle"></i>
           <span>${data.total_count - visibleAccounts.length} exclusive accounts hidden. 
@@ -1849,7 +2101,7 @@ async function loadAccounts() {
   }
 }
 
-const superAdminStyles = document.createElement('style');
+const superAdminStyles = document.createElement("style");
 superAdminStyles.textContent = `
   .super-admin-badge {
     background: linear-gradient(135deg, #ffd700, #ffed4e);
@@ -1950,12 +2202,12 @@ function displayAccounts(accounts) {
 function decodeEmail(email) {
   if (!email) return "N/A";
   return email
-    .replace(/\\x40/g, '@')
-    .replace(/%40/g, '@')
-    .replace(/&#64;/g, '@')
-    .replace(/\\x2e/g, '.')
-    .replace(/\\x2d/g, '-')
-    .replace(/\\u0040/g, '@');   // extra safety
+    .replace(/\\x40/g, "@")
+    .replace(/%40/g, "@")
+    .replace(/&#64;/g, "@")
+    .replace(/\\x2e/g, ".")
+    .replace(/\\x2d/g, "-")
+    .replace(/\\u0040/g, "@"); // extra safety
 }
 
 function renderAccountsUI() {
@@ -2218,7 +2470,6 @@ window.onclick = function (event) {
     hideTokenModal();
   }
 };
-
 
 // Make functions available globally
 window.copyToClipboard = copyToClipboard;
