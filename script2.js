@@ -601,153 +601,122 @@ async function startBulkRecheck() {
   progressContainer.style.display = 'block';
   resultsContainer.style.display = 'block';
   resultsList.innerHTML = '';
-  progressBar.style.width = '0%';
 
-  let validCount = 0;
-  let invalidCount = 0;
-  let errorCount = 0;
-  let totalChecked = 0;
-
-  // Add timeout for the fetch
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+  let totalValid = 0;
+  let totalInvalid = 0;
+  let totalProcessed = 0;
+  let offset = 0;
+  let hasMore = true;
+  const CHUNK_SIZE = 15; // Same as your batch check
 
   try {
-    const response = await fetch(`${API_URL}/api/admin/bulk-recheck`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache'
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    // Check if we got JSON instead of SSE (proxy might have converted it)
-    const contentType = response.headers.get('content-type') || '';
-    
-    if (contentType.includes('application/json')) {
-      // Proxy returned JSON instead of streaming
-      const data = await response.json();
-      if (data.status === 'error') {
-        throw new Error(data.message);
-      }
-      // Handle non-streaming response
-      statusEl.innerHTML = `<i class="fas fa-info-circle"></i> Server returned non-streaming response`;
-      return;
-    }
-
-    // Handle SSE stream
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let lastActivity = Date.now();
-
-    while (true) {
-      const { done, value } = await reader.read();
+    while (hasMore) {
+      statusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Processing chunk at offset ${offset}...`;
       
-      if (done) {
-        console.log('Stream completed');
+      const response = await fetch(`${API_URL}/api/admin/bulk-recheck`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          chunk_size: CHUNK_SIZE,
+          offset: offset
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'complete') {
+        // No more accounts
+        hasMore = false;
         break;
       }
 
-      lastActivity = Date.now();
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line
+      if (data.status !== 'success') {
+        throw new Error(data.message || 'Unknown error');
+      }
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      // Process chunk results (same pattern as your batch check)
+      const chunk = data.chunk || [];
+      chunk.forEach(result => {
+        totalProcessed++;
         
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            console.log('SSE event:', data.type, data);
-
-            if (data.type === 'progress') {
-              progressBar.style.width = `${data.percent}%`;
-              statusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Checking ${escapeHtml(data.email)}`;
-              statsEl.textContent = `${data.current} / ${data.total}`;
-              totalChecked = data.total;
-            } 
-            else if (data.type === 'result') {
-              const item = document.createElement('div');
-              item.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; animation: slideIn 0.3s ease;';
-              
-              if (data.status === 'valid') {
-                validCount++;
-                item.style.background = 'rgba(6,255,165,0.1)';
-                item.style.border = '1px solid rgba(6,255,165,0.2)';
-                item.innerHTML = `
-                  <i class="fas fa-check-circle" style="color: var(--accent-green)"></i>
-                  <span style="flex: 1; color: var(--text-primary)">${escapeHtml(data.email || 'Unknown')}</span>
-                  <span style="color: var(--accent-green)">${data.plan || 'Unknown'} • ${data.country || 'Unknown'}</span>
-                `;
-              } else if (data.status === 'invalid') {
-                invalidCount++;
-                item.style.background = 'rgba(230,57,70,0.1)';
-                item.style.border = '1px solid rgba(230,57,70,0.2)';
-                item.innerHTML = `
-                  <i class="fas fa-trash-alt" style="color: var(--accent-red)"></i>
-                  <span style="flex: 1; color: var(--text-primary); text-decoration: line-through; opacity: 0.6">${escapeHtml(data.email || 'Unknown')}</span>
-                  <span style="color: var(--accent-red)">Removed • ${data.reason || 'Invalid'}</span>
-                `;
-              } else {
-                errorCount++;
-                item.style.background = 'rgba(255,159,28,0.1)';
-                item.style.border = '1px solid rgba(255,159,28,0.2)';
-                item.innerHTML = `
-                  <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange)"></i>
-                  <span style="flex: 1; color: var(--text-primary)">${escapeHtml(data.email || 'Unknown')}</span>
-                  <span style="color: var(--accent-orange)">Error: ${escapeHtml(data.reason || 'Unknown')}</span>
-                `;
-              }
-              
-              resultsList.insertBefore(item, resultsList.firstChild);
-              
-              // Keep only last 50 results in DOM for performance
-              while (resultsList.children.length > 50) {
-                resultsList.removeChild(resultsList.lastChild);
-              }
-            }
-            else if (data.type === 'complete') {
-              progressBar.style.width = '100%';
-              statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--accent-green)"></i> ${data.message || 'Complete'}`;
-              statsEl.textContent = `${data.checked || totalChecked} checked • ${data.valid || validCount} valid • ${data.invalid || invalidCount} removed • ${data.errors || errorCount} errors`;
-              
-              showNotification(`✅ Recheck complete! ${data.valid || validCount} valid, ${data.invalid || invalidCount} removed`);
-              
-              // Refresh stats and account lists
-              loadAdminStats();
-              loadExclusiveAccounts();
-              break; // Exit the read loop
-            }
-            else if (data.type === 'error') {
-              throw new Error(data.message || 'Unknown error');
-            }
-          } catch (e) {
-            console.error('SSE parse error:', e, 'Line:', line);
-          }
+        const item = document.createElement('div');
+        item.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; animation: slideIn 0.3s ease;';
+        
+        if (result.status === 'valid') {
+          totalValid++;
+          item.style.background = 'rgba(6,255,165,0.1)';
+          item.style.border = '1px solid rgba(6,255,165,0.2)';
+          item.innerHTML = `
+            <i class="fas fa-check-circle" style="color: var(--accent-green)"></i>
+            <span style="flex: 1; color: var(--text-primary)">${escapeHtml(result.email)}</span>
+            <span style="color: var(--accent-green)">${result.plan || 'Unknown'} • ${result.country || 'Unknown'}</span>
+          `;
+        } else if (result.status === 'invalid') {
+          totalInvalid++;
+          item.style.background = 'rgba(230,57,70,0.1)';
+          item.style.border = '1px solid rgba(230,57,70,0.2)';
+          item.innerHTML = `
+            <i class="fas fa-trash-alt" style="color: var(--accent-red)"></i>
+            <span style="flex: 1; color: var(--text-primary); text-decoration: line-through; opacity: 0.6">${escapeHtml(result.email)}</span>
+            <span style="color: var(--accent-red)">Removed • ${result.reason || 'Invalid'}</span>
+          `;
+        } else {
+          item.style.background = 'rgba(255,159,28,0.1)';
+          item.style.border = '1px solid rgba(255,159,28,0.2)';
+          item.innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange)"></i>
+            <span style="flex: 1; color: var(--text-primary)">${escapeHtml(result.email)}</span>
+            <span style="color: var(--accent-orange)">Error: ${escapeHtml(result.reason || 'Unknown')}</span>
+          `;
         }
+        
+        resultsList.insertBefore(item, resultsList.firstChild);
+        
+        // Keep only last 50 results in DOM
+        while (resultsList.children.length > 50) {
+          resultsList.removeChild(resultsList.lastChild);
+        }
+      });
+
+      // Update progress
+      const totalAccounts = data.has_more ? (data.next_offset + chunk.length) : data.next_offset;
+      const percent = data.has_more ? Math.min((data.next_offset / (data.next_offset + 100)) * 100, 95) : 100;
+      progressBar.style.width = `${percent}%`;
+      statsEl.textContent = `${totalProcessed} processed • ${totalValid} valid • ${totalInvalid} removed`;
+
+      // Move to next chunk
+      hasMore = data.has_more;
+      offset = data.next_offset;
+
+      // Small delay between chunks to prevent overwhelming
+      if (hasMore) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
+
+    // Complete
+    progressBar.style.width = '100%';
+    statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--accent-green)"></i> Complete!`;
+    statsEl.textContent = `${totalProcessed} total • ${totalValid} valid • ${totalInvalid} removed`;
+    
+    showNotification(`✅ Recheck complete! ${totalValid} valid, ${totalInvalid} removed`);
+    
+    // Refresh stats and lists
+    loadAdminStats();
+    loadExclusiveAccounts();
+
   } catch (error) {
     console.error('Bulk recheck error:', error);
-    
-    if (error.name === 'AbortError') {
-      statusEl.innerHTML = `<i class="fas fa-clock" style="color: var(--accent-orange)"></i> Request timed out (5min)`;
-      showNotification('Bulk recheck timed out. Try with fewer accounts.', true);
-    } else {
-      statusEl.innerHTML = `<i class="fas fa-times-circle" style="color: var(--accent-red)"></i> Failed: ${error.message}`;
-      showNotification('Bulk recheck failed: ' + error.message, true);
-    }
+    statusEl.innerHTML = `<i class="fas fa-times-circle" style="color: var(--accent-red)"></i> Failed: ${error.message}`;
+    showNotification('Bulk recheck failed: ' + error.message, true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-sync-alt"></i> Start Bulk Recheck';
