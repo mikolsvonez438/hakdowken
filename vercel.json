@@ -6,5 +6,11 @@
       "source": "/api/:path*",
       "destination": "http://prem-eu3.bot-hosting.net:21582/api/:path*"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/validate-accounts",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
