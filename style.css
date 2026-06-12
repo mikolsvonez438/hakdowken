@@ -2420,3 +2420,69 @@ body.logged-in .login-prompt {
         text-align: center;
     }
 }
+/* Bulk Recheck Specific Styles */
+.recheck-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.recheck-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  opacity: 0.3;
+}
+
+#recheck-progress-container {
+  animation: fadeIn 0.3s ease;
+}
+
+#recheck-results {
+  animation: fadeIn 0.3s ease;
+}
+
+#recheck-results-list .file-item {
+  animation: slideIn 0.3s ease;
+}
+
+/* Super Admin Tab Specific */
+.super-admin-container .stats-grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 768px) {
+  .super-admin-container .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .recheck-section > div:first-child {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  
+  #bulk-recheck-btn {
+    width: 100% !important;
+  }
+}
+
+/* Recheck button spinning animation */
+@keyframes fa-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.fa-spin {
+  animation: fa-spin 1s linear infinite;
+}
+
+/* Strikethrough animation for removed accounts */
+@keyframes strike {
+  0% { width: 0; }
+  100% { width: 100%; }
+}
