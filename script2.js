@@ -200,7 +200,8 @@ async function checkSession() {
       accessToken = token;
       currentUser = data.user;
       isPremium = data.user.is_premium;
-      isSuperAdmin = data.user.is_super_admin || data.user.role === "super_admin";
+      isSuperAdmin =
+        data.user.is_super_admin || data.user.role === "super_admin";
       document.body.classList.add("logged-in");
       updateUIForUser();
     } else {
@@ -2535,9 +2536,13 @@ function addTVAuthTab() {
             <i class="fas fa-hashtag"></i> Enter TV Code
           </label>
           <div id="tv-code-inputs" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
-            ${Array(8).fill(0).map((_, i) => 
-              `<input type="text" maxlength="1" class="tv-code-digit" data-index="${i}" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">`
-            ).join('')}
+            ${Array(8)
+              .fill(0)
+              .map(
+                (_, i) =>
+                  `<input type="text" maxlength="1" class="tv-code-digit" data-index="${i}" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">`,
+              )
+              .join("")}
           </div>
           <div id="tv-code-error" style="color: var(--accent-red); font-size: 0.9rem; margin-top: 10px; display: none;"></div>
         </div>
@@ -2615,8 +2620,10 @@ async function checkStoredAccountsForTV() {
   try {
     const data = await apiCall("/api/accounts");
     if (data && data.status === "success") {
-      const accountsWithSecure = data.accounts.filter(a => a.secure_netflix_id);
-      
+      const accountsWithSecure = data.accounts.filter(
+        (a) => a.secure_netflix_id,
+      );
+
       if (accountsWithSecure.length > 0) {
         statusDiv.innerHTML = `
           <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
@@ -2688,7 +2695,10 @@ function initTVCodeInputs() {
     // Paste full code
     input.addEventListener("paste", (e) => {
       e.preventDefault();
-      const pasteData = e.clipboardData.getData("text").replace(/\D/g, "").substring(0, 8);
+      const pasteData = e.clipboardData
+        .getData("text")
+        .replace(/\D/g, "")
+        .substring(0, 8);
 
       for (let i = 0; i < pasteData.length && i < inputs.length; i++) {
         inputs[i].value = pasteData[i];
@@ -2708,7 +2718,9 @@ function initTVCodeInputs() {
 function getTVCode() {
   const inputs = document.querySelectorAll(".tv-code-digit");
   let code = "";
-  inputs.forEach((input) => { code += input.value; });
+  inputs.forEach((input) => {
+    code += input.value;
+  });
   return code;
 }
 
@@ -2723,7 +2735,9 @@ function checkTVCodeComplete() {
     });
   } else {
     document.querySelectorAll(".tv-code-digit").forEach((inp) => {
-      inp.style.borderColor = inp.value ? "var(--accent-cyan)" : "rgba(255,255,255,0.1)";
+      inp.style.borderColor = inp.value
+        ? "var(--accent-cyan)"
+        : "rgba(255,255,255,0.1)";
     });
   }
 }
@@ -2745,9 +2759,10 @@ async function submitTVCode() {
   // If custom NetflixId provided, SecureNetflixId is required
   const customNetflixId = netflixIdInput.value.trim();
   const customSecureId = secureIdInput.value.trim();
-  
+
   if (customNetflixId && !customSecureId) {
-    errorDiv.textContent = "SecureNetflixId is required when using custom NetflixId";
+    errorDiv.textContent =
+      "SecureNetflixId is required when using custom NetflixId";
     errorDiv.style.display = "block";
     secureIdInput.focus();
     return;
@@ -2757,7 +2772,8 @@ async function submitTVCode() {
 
   // Show loading
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Linking...</span>';
+  btn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i><span>Linking...</span>';
   resultDiv.innerHTML = `
     <div style="padding: 20px; text-align: center;">
       <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-cyan); margin-bottom: 10px;"></i>
@@ -2783,8 +2799,9 @@ async function submitTVCode() {
 
     const data = await response.json();
 
-    if (data.status === "success") {if (data.status === "success") {
-    resultDiv.innerHTML = `
+    // In your submitTVCode() function, the success case should be:
+    if (data.status === "success") {
+      resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
             <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-green);">
                 <i class="fas fa-check"></i>
@@ -2796,14 +2813,14 @@ async function submitTVCode() {
             </p>
         </div>
     `;
-    showNotification("TV device linked successfully!");
-    
-    // Clear code inputs
-    document.querySelectorAll(".tv-code-digit").forEach(inp => {
+      showNotification("TV device linked successfully!");
+
+      // Clear code inputs
+      document.querySelectorAll(".tv-code-digit").forEach((inp) => {
         inp.value = "";
         inp.style.borderColor = "rgba(255,255,255,0.1)";
-    });
-} else {
+      });
+    } else {
       resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
           <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-red);">
@@ -2811,11 +2828,15 @@ async function submitTVCode() {
           </div>
           <h3 style="color: var(--accent-red); margin-bottom: 10px;">Linking Failed</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
-          ${data.message.includes('SecureNetflixId') ? `
+          ${
+            data.message.includes("SecureNetflixId")
+              ? `
             <p style="color: var(--accent-orange); font-size: 0.85rem; margin-top: 10px;">
               <i class="fas fa-lightbulb"></i> Tip: Make sure your cookie export includes the SecureNetflixId cookie
             </p>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       `;
       showNotification(data.message, true);
