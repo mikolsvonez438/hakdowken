@@ -2520,8 +2520,13 @@ function addTVAuthTab() {
         <div class="tv-auth-info" style="margin-bottom: 20px; padding: 15px; background: rgba(0,212,255,0.05); border-radius: 8px; border-left: 3px solid var(--accent-cyan);">
           <i class="fas fa-info-circle" style="color: var(--accent-cyan); margin-right: 8px;"></i>
           <span style="color: var(--text-secondary); font-size: 0.9rem;">
-            Enter the 8-digit code shown on your TV screen. We'll use your stored Netflix account to link the device.
+            Enter the 8-digit code shown on your TV screen. We'll use your stored Netflix account (with SecureNetflixId) to link the device.
           </span>
+        </div>
+
+        <!-- Account Status -->
+        <div id="tv-account-status" style="margin-bottom: 20px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.85rem; color: var(--text-muted);">
+          <i class="fas fa-spinner fa-spin"></i> Checking stored accounts...
         </div>
 
         <!-- 8-Digit Code Input -->
@@ -2530,25 +2535,32 @@ function addTVAuthTab() {
             <i class="fas fa-hashtag"></i> Enter TV Code
           </label>
           <div id="tv-code-inputs" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="0" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="1" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="2" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="3" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="4" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="5" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="6" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
-            <input type="text" maxlength="1" class="tv-code-digit" data-index="7" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">
+            ${Array(8).fill(0).map((_, i) => 
+              `<input type="text" maxlength="1" class="tv-code-digit" data-index="${i}" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">`
+            ).join('')}
           </div>
           <div id="tv-code-error" style="color: var(--accent-red); font-size: 0.9rem; margin-top: 10px; display: none;"></div>
         </div>
 
         <!-- Optional: Custom NetflixId override -->
-        <div style="margin-bottom: 20px;">
+        <div style="margin-bottom: 15px;">
           <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.85rem;">
             <i class="fas fa-cookie"></i> NetflixId (Optional - uses stored account if empty)
           </label>
           <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use your stored account" 
                  style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;">
+        </div>
+
+        <!-- Optional: Custom SecureNetflixId -->
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.85rem;">
+            <i class="fas fa-shield-alt"></i> SecureNetflixId (Optional - required if using custom NetflixId)
+          </label>
+          <input type="text" id="tv-auth-secure-id" placeholder="Required for custom NetflixId" 
+                 style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;">
+          <div style="margin-top: 6px; font-size: 0.8rem; color: var(--accent-orange);">
+            <i class="fas fa-exclamation-triangle"></i> Both NetflixId AND SecureNetflixId are required for TV login to work
+          </div>
         </div>
 
         <button class="btn btn-primary btn-glow" id="tv-auth-submit-btn" onclick="submitTVCode()" style="width: 100%; padding: 16px;">
@@ -2590,144 +2602,49 @@ function addTVAuthTab() {
   `;
 
   appContent.appendChild(tvAuthContent);
-  setTimeout(() => initTVCodeInputs(), 100);
+  setTimeout(() => {
+    initTVCodeInputs();
+    checkStoredAccountsForTV();
+  }, 100);
 }
 
-function switchTVMethod(method) {
-  const codeSection = document.getElementById("tv-code-section");
-  const tokenSection = document.getElementById("tv-token-section");
-  const codeBtn = document.getElementById("tv-method-code");
-  const tokenBtn = document.getElementById("tv-method-token");
-
-  if (method === "code") {
-    codeSection.style.display = "block";
-    tokenSection.style.display = "none";
-    codeBtn.classList.add("btn-primary");
-    codeBtn.style.background = "";
-    tokenBtn.classList.remove("btn-primary");
-    tokenBtn.style.background = "rgba(255,255,255,0.05)";
-  } else {
-    codeSection.style.display = "none";
-    tokenSection.style.display = "block";
-    tokenBtn.classList.add("btn-primary");
-    tokenBtn.style.background = "linear-gradient(135deg, var(--accent-purple), #b347d9)";
-    codeBtn.classList.remove("btn-primary");
-    codeBtn.style.background = "rgba(255,255,255,0.05)";
-  }
-}
-
-async function generateTVLoginLink() {
-  const btn = document.getElementById("tv-token-generate-btn");
-  const resultDiv = document.getElementById("tv-auth-result");
-  const netflixIdInput = document.getElementById("tv-token-netflix-id");
-
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Generating...</span>';
-  resultDiv.innerHTML = "";
+async function checkStoredAccountsForTV() {
+  const statusDiv = document.getElementById("tv-account-status");
+  if (!statusDiv) return;
 
   try {
-    const body = {};
-    const customNetflixId = netflixIdInput.value.trim();
-    if (customNetflixId) {
-      body.netflix_id = customNetflixId;
-    }
-
-    const response = await fetch(`${API_URL}/api/tv-login-link`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-
-    if (data.status === "success") {
-      const result = data.data;
-      const expTime = result.expires 
-        ? new Date(result.expires * 1000).toLocaleString() 
-        : "Unknown";
-
-      resultDiv.innerHTML = `
-        <div style="padding: var(--space-lg); background: rgba(6,255,165,0.05); border: 1px solid rgba(6,255,165,0.2); border-radius: var(--radius-lg);">
-          <div style="text-align: center; margin-bottom: var(--space-lg);">
-            <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-green);">
-              <i class="fas fa-check"></i>
-            </div>
-            <h3 style="color: var(--accent-green); margin-bottom: var(--space-sm);">Token Generated!</h3>
-            <p style="color: var(--text-muted); font-size: 0.9rem;">Expires: ${expTime}</p>
-          </div>
-
-          <div style="background: rgba(0,0,0,0.3); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
-            <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">
-              <i class="fas fa-key"></i> Token
-            </div>
-            <code style="color: var(--accent-cyan); font-size: 0.85rem; word-break: break-all;">${result.token}</code>
-          </div>
-
-          <div style="display: grid; gap: var(--space-md);">
-            <div style="padding: var(--space-md); background: rgba(0,212,255,0.05); border: 1px solid rgba(0,212,255,0.2); border-radius: var(--radius-md);">
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-sm);">
-                <i class="fas fa-tv" style="color: var(--accent-cyan);"></i>
-                <strong style="color: var(--text-primary);">TV Link (Open on Phone!)</strong>
-              </div>
-              <a href="${result.login_urls.tv}" target="_blank" class="device-link" style="display: block; margin-bottom: var(--space-sm);">
-                <i class="fas fa-external-link-alt"></i> Open Netflix TV Login
-              </a>
-              <button class="btn-copy" onclick="copyToClipboard('${result.login_urls.tv}', 'TV link copied!')" style="width: 100%;">
-                <i class="fas fa-copy"></i> Copy TV Link
-              </button>
-            </div>
-
-            <div style="padding: var(--space-md); background: rgba(157,78,221,0.05); border: 1px solid rgba(157,78,221,0.2); border-radius: var(--radius-md);">
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-sm);">
-                <i class="fas fa-mobile-alt" style="color: var(--accent-purple);"></i>
-                <strong style="color: var(--text-primary);">Phone Link</strong>
-              </div>
-              <a href="${result.login_urls.phone}" target="_blank" class="device-link" style="display: block; margin-bottom: var(--space-sm);">
-                <i class="fas fa-external-link-alt"></i> Open on Phone
-              </a>
-              <button class="btn-copy" onclick="copyToClipboard('${result.login_urls.phone}', 'Phone link copied!')" style="width: 100%;">
-                <i class="fas fa-copy"></i> Copy Phone Link
-              </button>
-            </div>
-          </div>
-
-          <div style="margin-top: var(--space-lg); padding: var(--space-md); background: rgba(255,159,28,0.05); border: 1px solid rgba(255,159,28,0.2); border-radius: var(--radius-md);">
-            <strong style="color: var(--accent-orange); display: block; margin-bottom: var(--space-sm);">
-              <i class="fas fa-exclamation-triangle"></i> Important
-            </strong>
-            <ul style="color: var(--text-secondary); font-size: 0.9rem; padding-left: 20px; margin: 0;">
-              ${result.instructions.map(i => `<li style="margin-bottom: 4px;">${i}</li>`).join('')}
-            </ul>
-          </div>
-        </div>
-      `;
-      showNotification("TV login link generated successfully!");
+    const data = await apiCall("/api/accounts");
+    if (data && data.status === "success") {
+      const accountsWithSecure = data.accounts.filter(a => a.secure_netflix_id);
+      
+      if (accountsWithSecure.length > 0) {
+        statusDiv.innerHTML = `
+          <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
+          <span style="color: var(--accent-green);">Ready: ${accountsWithSecure.length} account(s) with SecureNetflixId available</span>
+        `;
+      } else if (data.accounts.length > 0) {
+        statusDiv.innerHTML = `
+          <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange);"></i>
+          <span style="color: var(--accent-orange);">Warning: ${data.accounts.length} account(s) found but none have SecureNetflixId. 
+          <a href="#" onclick="switchToTab('single'); return false;" style="color: var(--accent-cyan); text-decoration: underline;">Check a new cookie</a> to update.</span>
+        `;
+      } else {
+        statusDiv.innerHTML = `
+          <i class="fas fa-times-circle" style="color: var(--accent-red);"></i>
+          <span style="color: var(--accent-red);">No stored accounts found. Please check a cookie first.</span>
+        `;
+      }
     } else {
-      resultDiv.innerHTML = `
-        <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center;">
-          <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-red);">
-            <i class="fas fa-times"></i>
-          </div>
-          <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Generation Failed</h3>
-          <p style="color: var(--text-secondary);">${data.message}</p>
-        </div>
+      statusDiv.innerHTML = `
+        <i class="fas fa-times-circle" style="color: var(--accent-red);"></i>
+        <span style="color: var(--accent-red);">Failed to check accounts</span>
       `;
-      showNotification(data.message, true);
     }
-  } catch (error) {
-    resultDiv.innerHTML = `
-      <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center;">
-        <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Network Error</h3>
-        <p style="color: var(--text-secondary);">Failed to connect to server.</p>
-      </div>
+  } catch (e) {
+    statusDiv.innerHTML = `
+      <i class="fas fa-times-circle" style="color: var(--accent-red);"></i>
+      <span style="color: var(--accent-red);">Error checking accounts</span>
     `;
-    showNotification("Network error", true);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-magic"></i><span>Generate TV Login Link</span>';
   }
 }
 
@@ -2816,11 +2733,23 @@ async function submitTVCode() {
   const resultDiv = document.getElementById("tv-auth-result");
   const btn = document.getElementById("tv-auth-submit-btn");
   const netflixIdInput = document.getElementById("tv-auth-netflix-id");
+  const secureIdInput = document.getElementById("tv-auth-secure-id");
 
   // Validate
   if (code.length !== 8 || !/^\d{8}$/.test(code)) {
     errorDiv.textContent = "Please enter all 8 digits";
     errorDiv.style.display = "block";
+    return;
+  }
+
+  // If custom NetflixId provided, SecureNetflixId is required
+  const customNetflixId = netflixIdInput.value.trim();
+  const customSecureId = secureIdInput.value.trim();
+  
+  if (customNetflixId && !customSecureId) {
+    errorDiv.textContent = "SecureNetflixId is required when using custom NetflixId";
+    errorDiv.style.display = "block";
+    secureIdInput.focus();
     return;
   }
 
@@ -2832,15 +2761,15 @@ async function submitTVCode() {
   resultDiv.innerHTML = `
     <div style="padding: 20px; text-align: center;">
       <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-cyan); margin-bottom: 10px;"></i>
-      <p style="color: var(--text-secondary);">Submitting code to Netflix...</p>
+      <p style="color: var(--text-secondary);">Submitting code to Netflix with secure credentials...</p>
     </div>
   `;
 
   try {
     const body = { code };
-    const customNetflixId = netflixIdInput.value.trim();
     if (customNetflixId) {
       body.netflix_id = customNetflixId;
+      body.secure_netflix_id = customSecureId;
     }
 
     const response = await fetch(`${API_URL}/api/tv-auth`, {
@@ -2880,6 +2809,11 @@ async function submitTVCode() {
           </div>
           <h3 style="color: var(--accent-red); margin-bottom: 10px;">Linking Failed</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+          ${data.message.includes('SecureNetflixId') ? `
+            <p style="color: var(--accent-orange); font-size: 0.85rem; margin-top: 10px;">
+              <i class="fas fa-lightbulb"></i> Tip: Make sure your cookie export includes the SecureNetflixId cookie
+            </p>
+          ` : ''}
         </div>
       `;
       showNotification(data.message, true);
@@ -2897,7 +2831,6 @@ async function submitTVCode() {
     btn.innerHTML = '<i class="fas fa-plug"></i><span>Link TV Device</span>';
   }
 }
-
 // ---------------------------------
 
 // Close modals on outside click
@@ -2921,10 +2854,6 @@ window.hideTokenModal = hideTokenModal;
 window.toggleExclusive = toggleExclusive;
 window.loadExclusiveAccounts = loadExclusiveAccounts;
 
-
-
 // added
 
-window.switchTVMethod = switchTVMethod;
-window.generateTVLoginLink = generateTVLoginLink;
 window.submitTVCode = submitTVCode;
