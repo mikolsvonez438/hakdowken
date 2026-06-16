@@ -389,9 +389,8 @@ function switchToTab(tabId) {
     return;
   }
 
-  if (tabId === "tv-auth") {
-    selectedContent = document.getElementById("tv-auth-tab-content");
-  }
+  // ✅ FIX: Declare selectedContent HERE at the top, before any if statements
+  let selectedContent;
 
   // Remove active from all tabs and contents
   document
@@ -406,19 +405,17 @@ function switchToTab(tabId) {
   const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
   if (activeTab) activeTab.classList.add("active");
 
-  // Show the content
-  let selectedContent;
+  // ✅ Now assign to selectedContent (already declared above)
   if (tabId === "accounts") {
     selectedContent = document.getElementById("accounts-tab-content");
   } else if (tabId === "super-admin") {
     selectedContent = document.getElementById("super-admin-tab-content");
-    // Load exclusive accounts when super admin tab is opened
     setTimeout(() => loadExclusiveAccounts(), 100);
   } else if (tabId === "tv-auth") {
     selectedContent = document.getElementById("tv-auth-tab-content");
-} else {
+  } else {
     selectedContent = document.getElementById(`${tabId}-tab`);
-}
+  }
 
   if (selectedContent) {
     selectedContent.style.display = "block";
