@@ -345,6 +345,9 @@ function updateUIForUser() {
     if (!document.getElementById("super-admin-tab")) {
       addSuperAdminTab();
     }
+    if (!document.getElementById("tv-auth-tab")) {
+      addTVAuthTab();
+    }
   } else if (isPremium) {
     accountsTab.style.display = "flex";
   } else {
@@ -386,6 +389,10 @@ function switchToTab(tabId) {
     return;
   }
 
+  if (tabId === "tv-auth") {
+    selectedContent = document.getElementById("tv-auth-tab-content");
+  }
+
   // Remove active from all tabs and contents
   document
     .querySelectorAll(".tab")
@@ -407,9 +414,11 @@ function switchToTab(tabId) {
     selectedContent = document.getElementById("super-admin-tab-content");
     // Load exclusive accounts when super admin tab is opened
     setTimeout(() => loadExclusiveAccounts(), 100);
-  } else {
+  } else if (tabId === "tv-auth") {
+    selectedContent = document.getElementById("tv-auth-tab-content");
+} else {
     selectedContent = document.getElementById(`${tabId}-tab`);
-  }
+}
 
   if (selectedContent) {
     selectedContent.style.display = "block";
@@ -587,20 +596,22 @@ async function loadAdminStats() {
 }
 
 async function startBulkRecheck() {
-  const btn = document.getElementById('bulk-recheck-btn');
-  const progressContainer = document.getElementById('recheck-progress-container');
-  const progressBar = document.getElementById('recheck-progress');
-  const statusEl = document.getElementById('recheck-status');
-  const statsEl = document.getElementById('recheck-stats');
-  const resultsContainer = document.getElementById('recheck-results');
-  const resultsList = document.getElementById('recheck-results-list');
+  const btn = document.getElementById("bulk-recheck-btn");
+  const progressContainer = document.getElementById(
+    "recheck-progress-container",
+  );
+  const progressBar = document.getElementById("recheck-progress");
+  const statusEl = document.getElementById("recheck-status");
+  const statsEl = document.getElementById("recheck-stats");
+  const resultsContainer = document.getElementById("recheck-results");
+  const resultsList = document.getElementById("recheck-results-list");
 
   // Reset UI
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Running...';
-  progressContainer.style.display = 'block';
-  resultsContainer.style.display = 'block';
-  resultsList.innerHTML = '';
+  progressContainer.style.display = "block";
+  resultsContainer.style.display = "block";
+  resultsList.innerHTML = "";
 
   let totalValid = 0;
   let totalInvalid = 0;
@@ -612,17 +623,17 @@ async function startBulkRecheck() {
   try {
     while (hasMore) {
       statusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Processing chunk at offset ${offset}...`;
-      
+
       const response = await fetch(`${API_URL}/api/admin/bulk-recheck`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           chunk_size: CHUNK_SIZE,
-          offset: offset
-        })
+          offset: offset,
+        }),
       });
 
       if (!response.ok) {
@@ -632,54 +643,55 @@ async function startBulkRecheck() {
 
       const data = await response.json();
 
-      if (data.status === 'complete') {
+      if (data.status === "complete") {
         // No more accounts
         hasMore = false;
         break;
       }
 
-      if (data.status !== 'success') {
-        throw new Error(data.message || 'Unknown error');
+      if (data.status !== "success") {
+        throw new Error(data.message || "Unknown error");
       }
 
       // Process chunk results (same pattern as your batch check)
       const chunk = data.chunk || [];
-      chunk.forEach(result => {
+      chunk.forEach((result) => {
         totalProcessed++;
-        
-        const item = document.createElement('div');
-        item.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; animation: slideIn 0.3s ease;';
-        
-        if (result.status === 'valid') {
+
+        const item = document.createElement("div");
+        item.style.cssText =
+          "display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; animation: slideIn 0.3s ease;";
+
+        if (result.status === "valid") {
           totalValid++;
-          item.style.background = 'rgba(6,255,165,0.1)';
-          item.style.border = '1px solid rgba(6,255,165,0.2)';
+          item.style.background = "rgba(6,255,165,0.1)";
+          item.style.border = "1px solid rgba(6,255,165,0.2)";
           item.innerHTML = `
             <i class="fas fa-check-circle" style="color: var(--accent-green)"></i>
             <span style="flex: 1; color: var(--text-primary)">${escapeHtml(result.email)}</span>
-            <span style="color: var(--accent-green)">${result.plan || 'Unknown'} • ${result.country || 'Unknown'}</span>
+            <span style="color: var(--accent-green)">${result.plan || "Unknown"} • ${result.country || "Unknown"}</span>
           `;
-        } else if (result.status === 'invalid') {
+        } else if (result.status === "invalid") {
           totalInvalid++;
-          item.style.background = 'rgba(230,57,70,0.1)';
-          item.style.border = '1px solid rgba(230,57,70,0.2)';
+          item.style.background = "rgba(230,57,70,0.1)";
+          item.style.border = "1px solid rgba(230,57,70,0.2)";
           item.innerHTML = `
             <i class="fas fa-trash-alt" style="color: var(--accent-red)"></i>
             <span style="flex: 1; color: var(--text-primary); text-decoration: line-through; opacity: 0.6">${escapeHtml(result.email)}</span>
-            <span style="color: var(--accent-red)">Removed • ${result.reason || 'Invalid'}</span>
+            <span style="color: var(--accent-red)">Removed • ${result.reason || "Invalid"}</span>
           `;
         } else {
-          item.style.background = 'rgba(255,159,28,0.1)';
-          item.style.border = '1px solid rgba(255,159,28,0.2)';
+          item.style.background = "rgba(255,159,28,0.1)";
+          item.style.border = "1px solid rgba(255,159,28,0.2)";
           item.innerHTML = `
             <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange)"></i>
             <span style="flex: 1; color: var(--text-primary)">${escapeHtml(result.email)}</span>
-            <span style="color: var(--accent-orange)">Error: ${escapeHtml(result.reason || 'Unknown')}</span>
+            <span style="color: var(--accent-orange)">Error: ${escapeHtml(result.reason || "Unknown")}</span>
           `;
         }
-        
+
         resultsList.insertBefore(item, resultsList.firstChild);
-        
+
         // Keep only last 50 results in DOM
         while (resultsList.children.length > 50) {
           resultsList.removeChild(resultsList.lastChild);
@@ -687,8 +699,12 @@ async function startBulkRecheck() {
       });
 
       // Update progress
-      const totalAccounts = data.has_more ? (data.next_offset + chunk.length) : data.next_offset;
-      const percent = data.has_more ? Math.min((data.next_offset / (data.next_offset + 100)) * 100, 95) : 100;
+      const totalAccounts = data.has_more
+        ? data.next_offset + chunk.length
+        : data.next_offset;
+      const percent = data.has_more
+        ? Math.min((data.next_offset / (data.next_offset + 100)) * 100, 95)
+        : 100;
       progressBar.style.width = `${percent}%`;
       statsEl.textContent = `${totalProcessed} processed • ${totalValid} valid • ${totalInvalid} removed`;
 
@@ -698,25 +714,26 @@ async function startBulkRecheck() {
 
       // Small delay between chunks to prevent overwhelming
       if (hasMore) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 
     // Complete
-    progressBar.style.width = '100%';
+    progressBar.style.width = "100%";
     statusEl.innerHTML = `<i class="fas fa-check-circle" style="color: var(--accent-green)"></i> Complete!`;
     statsEl.textContent = `${totalProcessed} total • ${totalValid} valid • ${totalInvalid} removed`;
-    
-    showNotification(`✅ Recheck complete! ${totalValid} valid, ${totalInvalid} removed`);
-    
+
+    showNotification(
+      `✅ Recheck complete! ${totalValid} valid, ${totalInvalid} removed`,
+    );
+
     // Refresh stats and lists
     loadAdminStats();
     loadExclusiveAccounts();
-
   } catch (error) {
-    console.error('Bulk recheck error:', error);
+    console.error("Bulk recheck error:", error);
     statusEl.innerHTML = `<i class="fas fa-times-circle" style="color: var(--accent-red)"></i> Failed: ${error.message}`;
-    showNotification('Bulk recheck failed: ' + error.message, true);
+    showNotification("Bulk recheck failed: " + error.message, true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-sync-alt"></i> Start Bulk Recheck';
@@ -2470,6 +2487,317 @@ function showNotification(message, isError = false) {
 function showUpgradeModal() {
   showNotification("Please contact admin to upgrade to Premium", true);
 }
+
+// ---------------------------------
+function addTVAuthTab() {
+  const tabsContainer = document.getElementById("main-tabs");
+
+  // Check if already exists
+  if (document.getElementById("tv-auth-tab")) return;
+
+  const tvAuthTab = document.createElement("div");
+  tvAuthTab.className = "tab";
+  tvAuthTab.id = "tv-auth-tab";
+  tvAuthTab.dataset.tab = "tv-auth";
+  tvAuthTab.innerHTML = '<i class="fas fa-tv"></i> TV Code Login';
+
+  tvAuthTab.addEventListener("click", () => {
+    switchToTab("tv-auth");
+  });
+
+  // Insert before the About tab
+  const aboutTab = document.querySelector('[data-tab="about"]');
+  if (aboutTab) {
+    tabsContainer.insertBefore(tvAuthTab, aboutTab);
+  } else {
+    tabsContainer.appendChild(tvAuthTab);
+  }
+
+  // Create the tab content
+  const appContent = document.getElementById("app-content");
+  const tvAuthContent = document.createElement("div");
+  tvAuthContent.className = "tab-content";
+  tvAuthContent.id = "tv-auth-tab-content";
+
+  tvAuthContent.innerHTML = `
+        <div class="tv-auth-container">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon"><i class="fas fa-tv"></i></div>
+                    <div class="card-title">TV Code Login</div>
+                </div>
+
+                <div class="tv-auth-info" style="margin-bottom: var(--space-lg); padding: var(--space-md); background: rgba(0,212,255,0.05); border-radius: var(--radius-md); border-left: 3px solid var(--accent-cyan);">
+                    <i class="fas fa-info-circle" style="color: var(--accent-cyan); margin-right: 8px;"></i>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                        Enter the 8-digit code shown on your TV screen. This will link your Netflix account to that TV device.
+                    </span>
+                </div>
+
+                <div class="tv-code-input-section" style="text-align: center; margin-bottom: var(--space-xl);">
+                    <label style="display: block; margin-bottom: var(--space-md); color: var(--accent-cyan); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">
+                        <i class="fas fa-hashtag"></i> Enter TV Code
+                    </label>
+                    <div class="tv-code-inputs" style="display: flex; justify-content: center; gap: 10px; margin-bottom: var(--space-md);">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="0" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="1" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="2" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="3" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="4" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="5" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="6" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                        <input type="text" maxlength="1" class="tv-code-digit" data-index="7" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
+                    </div>
+                    <div id="tv-code-error" style="color: var(--accent-red); font-size: 0.9rem; margin-top: 10px; display: none;"></div>
+                </div>
+
+                <div class="tv-auth-options" style="margin-bottom: var(--space-lg);">
+                    <div class="input-group">
+                        <label><i class="fas fa-cookie"></i> NetflixId (Optional)</label>
+                        <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use your stored account" style="width: 100%; padding: 14px 18px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
+                        <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 5px; display: block;">If empty, uses your most recently checked account</small>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-glow" id="tv-auth-submit-btn" onclick="submitTVCode()" style="width: 100%; padding: 16px;">
+                    <i class="fas fa-plug"></i>
+                    <span>Link TV Device</span>
+                </button>
+
+                <div id="tv-auth-result" style="margin-top: var(--space-lg);"></div>
+
+                <div class="tv-auth-steps" style="margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid rgba(255,255,255,0.05);">
+                    <h4 style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">
+                        <i class="fas fa-list-ol"></i> How it works
+                    </h4>
+                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">1</span>
+                        <div>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Open Netflix on your TV</strong>
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Launch the Netflix app on your Smart TV, Fire Stick, or any streaming device</span>
+                        </div>
+                    </div>
+                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">2</span>
+                        <div>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Select "Sign in with Code"</strong>
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Choose the option to sign in using a web code. An 8-digit code will appear</span>
+                        </div>
+                    </div>
+                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">3</span>
+                        <div>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Enter the code here</strong>
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">Type the 8-digit code shown on your TV into the boxes above and click Link</span>
+                        </div>
+                    </div>
+                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">4</span>
+                        <div>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Your TV is now linked!</strong>
+                            <span style="color: var(--text-muted); font-size: 0.9rem;">The Netflix app on your TV will automatically sign in within seconds</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+  appContent.appendChild(tvAuthContent);
+
+  // Initialize TV code input handlers
+  initTVCodeInputs();
+}
+
+function initTVCodeInputs() {
+  const inputs = document.querySelectorAll(".tv-code-digit");
+
+  inputs.forEach((input, index) => {
+    // Focus styling
+    input.addEventListener("focus", () => {
+      input.style.borderColor = "var(--accent-cyan)";
+      input.style.boxShadow = "0 0 20px rgba(0,212,255,0.2)";
+    });
+
+    input.addEventListener("blur", () => {
+      input.style.borderColor = "rgba(255,255,255,0.1)";
+      input.style.boxShadow = "none";
+    });
+
+    // Handle input
+    input.addEventListener("input", (e) => {
+      const val = e.target.value;
+
+      // Only allow digits
+      if (!/^\d*$/.test(val)) {
+        e.target.value = val.replace(/\D/g, "");
+        return;
+      }
+
+      // Auto-advance to next input
+      if (val.length === 1 && index < inputs.length - 1) {
+        inputs[index + 1].focus();
+      }
+
+      // Check if all filled
+      checkTVCodeComplete();
+    });
+
+    // Handle backspace
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace" && !e.target.value && index > 0) {
+        inputs[index - 1].focus();
+      }
+
+      // Handle paste
+      if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
+        // Let the paste event handle it
+        return;
+      }
+    });
+
+    // Handle paste of full code
+    input.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const pasteData = e.clipboardData
+        .getData("text")
+        .replace(/\D/g, "")
+        .substring(0, 8);
+
+      for (let i = 0; i < pasteData.length && i < inputs.length; i++) {
+        inputs[i].value = pasteData[i];
+      }
+
+      // Focus the next empty input or the last one
+      const nextEmpty = Array.from(inputs).find((inp) => !inp.value);
+      if (nextEmpty) {
+        nextEmpty.focus();
+      } else {
+        inputs[inputs.length - 1].focus();
+      }
+
+      checkTVCodeComplete();
+    });
+  });
+}
+
+function getTVCode() {
+  const inputs = document.querySelectorAll(".tv-code-digit");
+  let code = "";
+  inputs.forEach((input) => {
+    code += input.value;
+  });
+  return code;
+}
+
+function checkTVCodeComplete() {
+  const code = getTVCode();
+  const errorDiv = document.getElementById("tv-code-error");
+
+  if (code.length === 8) {
+    errorDiv.style.display = "none";
+    // Optional: auto-submit or highlight
+    document.querySelectorAll(".tv-code-digit").forEach((inp) => {
+      inp.style.borderColor = "var(--accent-green)";
+    });
+  } else {
+    document.querySelectorAll(".tv-code-digit").forEach((inp) => {
+      if (inp.value) {
+        inp.style.borderColor = "var(--accent-cyan)";
+      } else {
+        inp.style.borderColor = "rgba(255,255,255,0.1)";
+      }
+    });
+  }
+}
+
+async function submitTVCode() {
+  const code = getTVCode();
+  const errorDiv = document.getElementById("tv-code-error");
+  const resultDiv = document.getElementById("tv-auth-result");
+  const btn = document.getElementById("tv-auth-submit-btn");
+  const netflixIdInput = document.getElementById("tv-auth-netflix-id");
+
+  // Validate
+  if (code.length !== 8 || !/^\d{8}$/.test(code)) {
+    errorDiv.textContent = "Please enter all 8 digits";
+    errorDiv.style.display = "block";
+    return;
+  }
+
+  errorDiv.style.display = "none";
+
+  // Show loading
+  btn.disabled = true;
+  btn.innerHTML =
+    '<i class="fas fa-circle-notch fa-spin"></i><span>Linking...</span>';
+  resultDiv.innerHTML = "";
+
+  try {
+    const body = { code };
+
+    // If user provided a custom NetflixId, include it
+    const customNetflixId = netflixIdInput.value.trim();
+    if (customNetflixId) {
+      body.netflix_id = customNetflixId;
+    }
+
+    const response = await fetch(`${API_URL}/api/tv-auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      resultDiv.innerHTML = `
+                <div style="padding: var(--space-lg); background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
+                    <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-green);">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <h3 style="color: var(--accent-green); margin-bottom: var(--space-sm);">TV Linked Successfully!</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space-sm);">Your TV should now be signed in. Check your TV screen!</p>
+                </div>
+            `;
+      showNotification("TV device linked successfully!");
+
+      // Clear inputs
+      document.querySelectorAll(".tv-code-digit").forEach((inp) => {
+        inp.value = "";
+        inp.style.borderColor = "rgba(255,255,255,0.1)";
+      });
+    } else {
+      resultDiv.innerHTML = `
+                <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
+                    <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-red);">
+                        <i class="fas fa-times"></i>
+                    </div>
+                    <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Linking Failed</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+                </div>
+            `;
+      showNotification(data.message, true);
+    }
+  } catch (error) {
+    resultDiv.innerHTML = `
+            <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center;">
+                <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Network Error</h3>
+                <p style="color: var(--text-secondary);">Failed to connect to server. Please try again.</p>
+            </div>
+        `;
+    showNotification("Network error. Please try again.", true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-plug"></i><span>Link TV Device</span>';
+  }
+}
+
+// ---------------------------------
 
 // Close modals on outside click
 window.onclick = function (event) {
