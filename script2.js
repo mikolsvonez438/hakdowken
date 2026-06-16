@@ -2487,6 +2487,7 @@ function showUpgradeModal() {
 }
 
 // ---------------------------------
+let currentTVAccount = null;
 function addTVAuthTab() {
   const tabsContainer = document.getElementById("main-tabs");
   if (document.getElementById("tv-auth-tab")) return;
@@ -2521,13 +2522,32 @@ function addTVAuthTab() {
         <div class="tv-auth-info" style="margin-bottom: 20px; padding: 15px; background: rgba(0,212,255,0.05); border-radius: 8px; border-left: 3px solid var(--accent-cyan);">
           <i class="fas fa-info-circle" style="color: var(--accent-cyan); margin-right: 8px;"></i>
           <span style="color: var(--text-secondary); font-size: 0.9rem;">
-            Enter the 8-digit code shown on your TV screen. We'll use your stored Netflix account (with SecureNetflixId) to link the device.
+            Enter the 8-digit code shown on your TV screen. We'll automatically pick a random working account from the database.
           </span>
         </div>
 
-        <!-- Account Status -->
+        <!-- Account Status / Current Account Display -->
         <div id="tv-account-status" style="margin-bottom: 20px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.85rem; color: var(--text-muted);">
-          <i class="fas fa-spinner fa-spin"></i> Checking stored accounts...
+          <i class="fas fa-spinner fa-spin"></i> Checking available accounts...
+        </div>
+
+        <!-- Current Account Card (shown when account is selected) -->
+        <div id="tv-current-account" style="display: none; margin-bottom: 20px; padding: 15px; background: rgba(6,255,165,0.05); border: 1px solid rgba(6,255,165,0.2); border-radius: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">
+                <i class="fas fa-random"></i> Random Account Selected
+              </div>
+              <div id="tv-account-email" style="font-weight: 600; color: var(--text-primary); font-size: 1rem;">-</div>
+              <div style="display: flex; gap: 10px; margin-top: 4px; font-size: 0.8rem; color: var(--text-secondary);">
+                <span id="tv-account-country"><i class="fas fa-globe"></i> -</span>
+                <span id="tv-account-plan"><i class="fas fa-tag"></i> -</span>
+              </div>
+            </div>
+            <button onclick="switchTVAccount()" id="tv-switch-btn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; width: auto;">
+              <i class="fas fa-sync-alt"></i> Try Different Account
+            </button>
+          </div>
         </div>
 
         <!-- 8-Digit Code Input -->
@@ -2536,13 +2556,9 @@ function addTVAuthTab() {
             <i class="fas fa-hashtag"></i> Enter TV Code
           </label>
           <div id="tv-code-inputs" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
-            ${Array(8)
-              .fill(0)
-              .map(
-                (_, i) =>
-                  `<input type="text" maxlength="1" class="tv-code-digit" data-index="${i}" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">`,
-              )
-              .join("")}
+            ${Array(8).fill(0).map((_, i) =>
+              `<input type="text" maxlength="1" class="tv-code-digit" data-index="${i}" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); transition: all 0.3s;">`
+            ).join("")}
           </div>
           <div id="tv-code-error" style="color: var(--accent-red); font-size: 0.9rem; margin-top: 10px; display: none;"></div>
         </div>
@@ -2550,9 +2566,9 @@ function addTVAuthTab() {
         <!-- Optional: Custom NetflixId override -->
         <div style="margin-bottom: 15px;">
           <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.85rem;">
-            <i class="fas fa-cookie"></i> NetflixId (Optional - uses stored account if empty)
+            <i class="fas fa-cookie"></i> NetflixId (Optional - uses random account if empty)
           </label>
-          <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use your stored account" 
+          <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use random account from database" 
                  style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;">
         </div>
 
@@ -2598,7 +2614,7 @@ function addTVAuthTab() {
             <span style="width: 28px; height: 28px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0;">3</span>
             <div>
               <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Click "Link TV Device"</strong>
-              <span style="color: var(--text-muted); font-size: 0.85rem;">Your TV will sign in automatically within 10-30 seconds</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">Your TV will sign in automatically within 10-30 seconds using a random account</span>
             </div>
           </div>
         </div>
@@ -2610,8 +2626,80 @@ function addTVAuthTab() {
   setTimeout(() => {
     initTVCodeInputs();
     checkStoredAccountsForTV();
+    loadCurrentTVAccount();
   }, 100);
 }
+
+async function loadCurrentTVAccount() {
+  const statusDiv = document.getElementById("tv-account-status");
+  const accountCard = document.getElementById("tv-current-account");
+  const emailEl = document.getElementById("tv-account-email");
+  const countryEl = document.getElementById("tv-account-country");
+  const planEl = document.getElementById("tv-account-plan");
+
+  try {
+    const data = await apiCall("/api/tv-auth/current-account");
+    if (data && data.status === "success" && data.has_account && data.account) {
+      currentTVAccount = data.account;
+      statusDiv.style.display = "none";
+      accountCard.style.display = "block";
+      emailEl.textContent = sanitizeDisplay(data.account.email);
+      countryEl.innerHTML = `<i class="fas fa-globe"></i> ${data.account.country || 'Unknown'}`;
+      planEl.innerHTML = `<i class="fas fa-tag"></i> ${data.account.plan || 'Unknown'}`;
+    } else {
+      // No account selected yet - show available count
+      const accountsData = await apiCall("/api/accounts");
+      if (accountsData && accountsData.status === "success") {
+        const withSecure = accountsData.accounts.filter(a => a.secure_netflix_id).length;
+        statusDiv.innerHTML = `
+          <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
+          <span style="color: var(--accent-green);">${withSecure} account(s) available for TV login. A random one will be selected when you submit.</span>
+        `;
+      } else {
+        statusDiv.innerHTML = `
+          <i class="fas fa-exclamation-triangle" style="color: var(--accent-orange);"></i>
+          <span style="color: var(--accent-orange);">Please check a cookie first to add accounts to the database.</span>
+        `;
+      }
+    }
+  } catch (e) {
+    statusDiv.innerHTML = `
+      <i class="fas fa-times-circle" style="color: var(--accent-red);"></i>
+      <span style="color: var(--accent-red);">Error checking accounts</span>
+    `;
+  }
+}
+
+// NEW: Switch to a different random account
+async function switchTVAccount() {
+  const btn = document.getElementById("tv-switch-btn");
+  const emailEl = document.getElementById("tv-account-email");
+  const countryEl = document.getElementById("tv-account-country");
+  const planEl = document.getElementById("tv-account-plan");
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Switching...';
+
+  try {
+    const data = await apiCall("/api/tv-auth/switch-account", { method: "POST" });
+    if (data && data.status === "success" && data.account) {
+      currentTVAccount = data.account;
+      emailEl.textContent = sanitizeDisplay(data.account.email);
+      countryEl.innerHTML = `<i class="fas fa-globe"></i> ${data.account.country || 'Unknown'}`;
+      planEl.innerHTML = `<i class="fas fa-tag"></i> ${data.account.plan || 'Unknown'}`;
+      showNotification(`Switched to: ${sanitizeDisplay(data.account.email)}`);
+    } else {
+      showNotification(data?.message || "Failed to switch account", true);
+    }
+  } catch (e) {
+    showNotification("Failed to switch account", true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sync-alt"></i> Try Different Account';
+  }
+}
+
+
 
 async function checkStoredAccountsForTV() {
   const statusDiv = document.getElementById("tv-account-status");
@@ -2620,10 +2708,7 @@ async function checkStoredAccountsForTV() {
   try {
     const data = await apiCall("/api/accounts");
     if (data && data.status === "success") {
-      const accountsWithSecure = data.accounts.filter(
-        (a) => a.secure_netflix_id,
-      );
-
+      const accountsWithSecure = data.accounts.filter(a => a.secure_netflix_id);
       if (accountsWithSecure.length > 0) {
         statusDiv.innerHTML = `
           <i class="fas fa-check-circle" style="color: var(--accent-green);"></i>
@@ -2655,92 +2740,53 @@ async function checkStoredAccountsForTV() {
   }
 }
 
+
+
 function initTVCodeInputs() {
   const inputs = document.querySelectorAll(".tv-code-digit");
-
   inputs.forEach((input, index) => {
     input.addEventListener("focus", () => {
       input.style.borderColor = "var(--accent-cyan)";
       input.style.boxShadow = "0 0 20px rgba(0,212,255,0.2)";
     });
-
     input.addEventListener("blur", () => {
       input.style.borderColor = "rgba(255,255,255,0.1)";
       input.style.boxShadow = "none";
     });
-
     input.addEventListener("input", (e) => {
       const val = e.target.value;
-
-      // Only digits
       if (!/^\d*$/.test(val)) {
         e.target.value = val.replace(/\D/g, "");
         return;
       }
-
-      // Auto-advance
       if (val.length === 1 && index < inputs.length - 1) {
         inputs[index + 1].focus();
       }
-
       checkTVCodeComplete();
     });
-
     input.addEventListener("keydown", (e) => {
       if (e.key === "Backspace" && !e.target.value && index > 0) {
         inputs[index - 1].focus();
       }
     });
-
-    // Paste full code
     input.addEventListener("paste", (e) => {
       e.preventDefault();
-      const pasteData = e.clipboardData
-        .getData("text")
-        .replace(/\D/g, "")
-        .substring(0, 8);
-
+      const pasteData = e.clipboardData.getData("text").replace(/\D/g, "").substring(0, 8);
       for (let i = 0; i < pasteData.length && i < inputs.length; i++) {
         inputs[i].value = pasteData[i];
       }
-
       const nextEmpty = Array.from(inputs).find((inp) => !inp.value);
       if (nextEmpty) {
         nextEmpty.focus();
       } else {
         inputs[inputs.length - 1].focus();
       }
-
       checkTVCodeComplete();
     });
   });
 }
-function getTVCode() {
-  const inputs = document.querySelectorAll(".tv-code-digit");
-  let code = "";
-  inputs.forEach((input) => {
-    code += input.value;
-  });
-  return code;
-}
 
-function checkTVCodeComplete() {
-  const code = getTVCode();
-  const errorDiv = document.getElementById("tv-code-error");
 
-  if (code.length === 8) {
-    errorDiv.style.display = "none";
-    document.querySelectorAll(".tv-code-digit").forEach((inp) => {
-      inp.style.borderColor = "var(--accent-green)";
-    });
-  } else {
-    document.querySelectorAll(".tv-code-digit").forEach((inp) => {
-      inp.style.borderColor = inp.value
-        ? "var(--accent-cyan)"
-        : "rgba(255,255,255,0.1)";
-    });
-  }
-}
 async function submitTVCode() {
   const code = getTVCode();
   const errorDiv = document.getElementById("tv-code-error");
@@ -2749,31 +2795,25 @@ async function submitTVCode() {
   const netflixIdInput = document.getElementById("tv-auth-netflix-id");
   const secureIdInput = document.getElementById("tv-auth-secure-id");
 
-  // Validate
   if (code.length !== 8 || !/^\d{8}$/.test(code)) {
     errorDiv.textContent = "Please enter all 8 digits";
     errorDiv.style.display = "block";
     return;
   }
 
-  // If custom NetflixId provided, SecureNetflixId is required
   const customNetflixId = netflixIdInput.value.trim();
   const customSecureId = secureIdInput.value.trim();
 
   if (customNetflixId && !customSecureId) {
-    errorDiv.textContent =
-      "SecureNetflixId is required when using custom NetflixId";
+    errorDiv.textContent = "SecureNetflixId is required when using custom NetflixId";
     errorDiv.style.display = "block";
     secureIdInput.focus();
     return;
   }
 
   errorDiv.style.display = "none";
-
-  // Show loading
   btn.disabled = true;
-  btn.innerHTML =
-    '<i class="fas fa-circle-notch fa-spin"></i><span>Linking...</span>';
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Linking...</span>';
   resultDiv.innerHTML = `
     <div style="padding: 20px; text-align: center;">
       <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-cyan); margin-bottom: 10px;"></i>
@@ -2799,8 +2839,19 @@ async function submitTVCode() {
 
     const data = await response.json();
 
-    // In your submitTVCode() function, the success case should be:
     if (data.status === "success") {
+      let accountInfoHtml = "";
+      if (data.account_used) {
+        accountInfoHtml = `
+          <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.85rem;">
+            <div style="color: var(--text-muted); margin-bottom: 4px;"><i class="fas fa-user"></i> Account used:</div>
+            <div style="color: var(--text-primary); font-weight: 600;">${sanitizeDisplay(data.account_used.email)}</div>
+            <div style="color: var(--text-secondary); font-size: 0.8rem;">
+              ${data.account_used.country} | ${data.account_used.plan}
+            </div>
+          </div>
+        `;
+      }
       resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
             <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-green);">
@@ -2811,16 +2862,28 @@ async function submitTVCode() {
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">
                 <i class="fas fa-tv"></i> Check your TV - it should show your profile selection screen within 30 seconds.
             </p>
+            ${accountInfoHtml}
         </div>
-    `;
+      `;
       showNotification("TV device linked successfully!");
-
-      // Clear code inputs
       document.querySelectorAll(".tv-code-digit").forEach((inp) => {
         inp.value = "";
         inp.style.borderColor = "rgba(255,255,255,0.1)";
       });
+      // Refresh the current account display for next time
+      setTimeout(() => loadCurrentTVAccount(), 1000);
     } else {
+      // Check if it's an expired account error with retry suggestion
+      let retryButtonHtml = "";
+      if (data.account_expired || (data.message && data.message.includes("expired"))) {
+        retryButtonHtml = `
+          <div style="margin-top: 15px;">
+            <button onclick="switchTVAccountAndRetry('${code}')" class="btn btn-primary" style="padding: 10px 20px; font-size: 0.9rem; width: auto;">
+              <i class="fas fa-sync-alt"></i> Try with Different Account
+            </button>
+          </div>
+        `;
+      }
       resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
           <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-red);">
@@ -2828,15 +2891,12 @@ async function submitTVCode() {
           </div>
           <h3 style="color: var(--accent-red); margin-bottom: 10px;">Linking Failed</h3>
           <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
-          ${
-            data.message.includes("SecureNetflixId")
-              ? `
+          ${data.message.includes("SecureNetflixId") ? `
             <p style="color: var(--accent-orange); font-size: 0.85rem; margin-top: 10px;">
               <i class="fas fa-lightbulb"></i> Tip: Make sure your cookie export includes the SecureNetflixId cookie
             </p>
-          `
-              : ""
-          }
+          ` : ""}
+          ${retryButtonHtml}
         </div>
       `;
       showNotification(data.message, true);
@@ -2854,6 +2914,113 @@ async function submitTVCode() {
     btn.innerHTML = '<i class="fas fa-plug"></i><span>Link TV Device</span>';
   }
 }
+
+// NEW: Switch account and automatically retry with same code
+async function switchTVAccountAndRetry(code) {
+  const resultDiv = document.getElementById("tv-auth-result");
+  resultDiv.innerHTML = `
+    <div style="padding: 20px; text-align: center;">
+      <i class="fas fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-cyan); margin-bottom: 10px;"></i>
+      <p style="color: var(--text-secondary);">Switching account and retrying...</p>
+    </div>
+  `;
+
+  // First switch the account
+  try {
+    const switchData = await apiCall("/api/tv-auth/switch-account", { method: "POST" });
+    if (switchData.status !== "success") {
+      showNotification(switchData.message || "Failed to switch account", true);
+      resultDiv.innerHTML = "";
+      return;
+    }
+
+    // Update the display
+    await loadCurrentTVAccount();
+
+    // Now retry with the new account (force_switch=true)
+    const response = await fetch(`${API_URL}/api/tv-auth`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ code, force_switch: true }),
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      let accountInfoHtml = "";
+      if (data.account_used) {
+        accountInfoHtml = `
+          <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.85rem;">
+            <div style="color: var(--text-muted); margin-bottom: 4px;"><i class="fas fa-user"></i> Account used:</div>
+            <div style="color: var(--text-primary); font-weight: 600;">${sanitizeDisplay(data.account_used.email)}</div>
+            <div style="color: var(--text-secondary); font-size: 0.8rem;">
+              ${data.account_used.country} | ${data.account_used.plan}
+            </div>
+          </div>
+        `;
+      }
+      resultDiv.innerHTML = `
+        <div style="padding: 25px; background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
+            <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-green);">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 style="color: var(--accent-green); margin-bottom: 10px;">TV Linked Successfully!</h3>
+            <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">
+                <i class="fas fa-tv"></i> Check your TV - it should show your profile selection screen within 30 seconds.
+            </p>
+            ${accountInfoHtml}
+        </div>
+      `;
+      showNotification("TV device linked successfully with new account!");
+      document.querySelectorAll(".tv-code-digit").forEach((inp) => {
+        inp.value = "";
+        inp.style.borderColor = "rgba(255,255,255,0.1)";
+      });
+      setTimeout(() => loadCurrentTVAccount(), 1000);
+    } else {
+      let retryAgainHtml = "";
+      if (data.account_expired) {
+        retryAgainHtml = `
+          <div style="margin-top: 15px;">
+            <button onclick="switchTVAccountAndRetry('${code}')" class="btn btn-primary" style="padding: 10px 20px; font-size: 0.9rem; width: auto;">
+              <i class="fas fa-sync-alt"></i> Try Another Account
+            </button>
+          </div>
+        `;
+      }
+      resultDiv.innerHTML = `
+        <div style="padding: 25px; background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
+          <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-red);">
+            <i class="fas fa-times"></i>
+          </div>
+          <h3 style="color: var(--accent-red); margin-bottom: 10px;">Still Failed</h3>
+          <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+          ${retryAgainHtml}
+        </div>
+      `;
+      showNotification(data.message, true);
+    }
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div style="padding: 25px; background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: 12px; text-align: center;">
+        <h3 style="color: var(--accent-red); margin-bottom: 10px;">Error</h3>
+        <p style="color: var(--text-secondary);">Failed to switch and retry.</p>
+      </div>
+    `;
+    showNotification("Failed to retry with new account", true);
+  }
+}
+
+// Make new functions available globally
+window.switchTVAccount = switchTVAccount;
+window.switchTVAccountAndRetry = switchTVAccountAndRetry;
+window.loadCurrentTVAccount = loadCurrentTVAccount;
+
+
 // ---------------------------------
 
 // Close modals on outside click
