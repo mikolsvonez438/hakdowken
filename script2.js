@@ -2752,15 +2752,15 @@ async function submitTVCode() {
 
     if (data.status === "success") {
       resultDiv.innerHTML = `
-                <div style="padding: var(--space-lg); background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
-                    <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-green);">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <h3 style="color: var(--accent-green); margin-bottom: var(--space-sm);">TV Linked Successfully!</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space-sm);">Your TV should now be signed in. Check your TV screen!</p>
+            <div style="padding: var(--space-lg); background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
+                <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-green);">
+                    <i class="fas fa-check"></i>
                 </div>
-            `;
+                <h3 style="color: var(--accent-green); margin-bottom: var(--space-sm);">TV Linked Successfully!</h3>
+                <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space-sm);">Check your TV - it should be signed in within 10-30 seconds.</p>
+            </div>
+        `;
       showNotification("TV device linked successfully!");
 
       // Clear inputs
@@ -2768,16 +2768,31 @@ async function submitTVCode() {
         inp.value = "";
         inp.style.borderColor = "rgba(255,255,255,0.1)";
       });
-    } else {
+    } else if (data.status === "unknown") {
+      // Ambiguous result - tell user to check TV
       resultDiv.innerHTML = `
-                <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
-                    <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-red);">
-                        <i class="fas fa-times"></i>
-                    </div>
-                    <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Linking Failed</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+            <div style="padding: var(--space-lg); background: rgba(255,159,28,0.1); border: 1px solid var(--accent-orange); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
+                <div style="width: 60px; height: 60px; background: rgba(255,159,28,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-orange);">
+                    <i class="fas fa-question"></i>
                 </div>
-            `;
+                <h3 style="color: var(--accent-orange); margin-bottom: var(--space-sm);">Status Unclear</h3>
+                <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: var(--space-sm);">Please check your TV. If it's not signed in, try a new code.</p>
+            </div>
+        `;
+      showNotification(data.message, true);
+    } else {
+      // Error
+      resultDiv.innerHTML = `
+            <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center; animation: slideIn 0.3s ease;">
+                <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-red);">
+                    <i class="fas fa-times"></i>
+                </div>
+                <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Linking Failed</h3>
+                <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+                ${data.debug_info ? `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: var(--space-sm);">Debug: ${JSON.stringify(data.debug_info)}</p>` : ""}
+            </div>
+        `;
       showNotification(data.message, true);
     }
   } catch (error) {
