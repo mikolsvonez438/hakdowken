@@ -2488,21 +2488,18 @@ function showUpgradeModal() {
 // ---------------------------------
 function addTVAuthTab() {
   const tabsContainer = document.getElementById("main-tabs");
-
-  // Check if already exists
   if (document.getElementById("tv-auth-tab")) return;
 
   const tvAuthTab = document.createElement("div");
   tvAuthTab.className = "tab";
   tvAuthTab.id = "tv-auth-tab";
   tvAuthTab.dataset.tab = "tv-auth";
-  tvAuthTab.innerHTML = '<i class="fas fa-tv"></i> TV Code Login';
+  tvAuthTab.innerHTML = '<i class="fas fa-tv"></i> TV Login';
 
   tvAuthTab.addEventListener("click", () => {
     switchToTab("tv-auth");
   });
 
-  // Insert before the About tab
   const aboutTab = document.querySelector('[data-tab="about"]');
   if (aboutTab) {
     tabsContainer.insertBefore(tvAuthTab, aboutTab);
@@ -2510,100 +2507,194 @@ function addTVAuthTab() {
     tabsContainer.appendChild(tvAuthTab);
   }
 
-  // Create the tab content
   const appContent = document.getElementById("app-content");
   const tvAuthContent = document.createElement("div");
   tvAuthContent.className = "tab-content";
   tvAuthContent.id = "tv-auth-tab-content";
 
   tvAuthContent.innerHTML = `
-        <div class="tv-auth-container">
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-icon"><i class="fas fa-tv"></i></div>
-                    <div class="card-title">TV Code Login</div>
-                </div>
-
-                <div class="tv-auth-info" style="margin-bottom: var(--space-lg); padding: var(--space-md); background: rgba(0,212,255,0.05); border-radius: var(--radius-md); border-left: 3px solid var(--accent-cyan);">
-                    <i class="fas fa-info-circle" style="color: var(--accent-cyan); margin-right: 8px;"></i>
-                    <span style="color: var(--text-secondary); font-size: 0.9rem;">
-                        Enter the 8-digit code shown on your TV screen. This will link your Netflix account to that TV device.
-                    </span>
-                </div>
-
-                <div class="tv-code-input-section" style="text-align: center; margin-bottom: var(--space-xl);">
-                    <label style="display: block; margin-bottom: var(--space-md); color: var(--accent-cyan); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">
-                        <i class="fas fa-hashtag"></i> Enter TV Code
-                    </label>
-                    <div class="tv-code-inputs" style="display: flex; justify-content: center; gap: 10px; margin-bottom: var(--space-md);">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="0" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="1" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="2" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="3" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="4" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="5" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="6" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                        <input type="text" maxlength="1" class="tv-code-digit" data-index="7" style="width: 50px; height: 60px; text-align: center; font-size: 1.5rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); transition: all 0.3s;">
-                    </div>
-                    <div id="tv-code-error" style="color: var(--accent-red); font-size: 0.9rem; margin-top: 10px; display: none;"></div>
-                </div>
-
-                <div class="tv-auth-options" style="margin-bottom: var(--space-lg);">
-                    <div class="input-group">
-                        <label><i class="fas fa-cookie"></i> NetflixId (Optional)</label>
-                        <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use your stored account" style="width: 100%; padding: 14px 18px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
-                        <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 5px; display: block;">If empty, uses your most recently checked account</small>
-                    </div>
-                </div>
-
-                <button class="btn btn-primary btn-glow" id="tv-auth-submit-btn" onclick="submitTVCode()" style="width: 100%; padding: 16px;">
-                    <i class="fas fa-plug"></i>
-                    <span>Link TV Device</span>
-                </button>
-
-                <div id="tv-auth-result" style="margin-top: var(--space-lg);"></div>
-
-                <div class="tv-auth-steps" style="margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid rgba(255,255,255,0.05);">
-                    <h4 style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">
-                        <i class="fas fa-list-ol"></i> How it works
-                    </h4>
-                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
-                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">1</span>
-                        <div>
-                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Open Netflix on your TV</strong>
-                            <span style="color: var(--text-muted); font-size: 0.9rem;">Launch the Netflix app on your Smart TV, Fire Stick, or any streaming device</span>
-                        </div>
-                    </div>
-                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
-                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">2</span>
-                        <div>
-                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Select "Sign in with Code"</strong>
-                            <span style="color: var(--text-muted); font-size: 0.9rem;">Choose the option to sign in using a web code. An 8-digit code will appear</span>
-                        </div>
-                    </div>
-                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
-                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">3</span>
-                        <div>
-                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Enter the code here</strong>
-                            <span style="color: var(--text-muted); font-size: 0.9rem;">Type the 8-digit code shown on your TV into the boxes above and click Link</span>
-                        </div>
-                    </div>
-                    <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
-                        <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">4</span>
-                        <div>
-                            <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Your TV is now linked!</strong>
-                            <span style="color: var(--text-muted); font-size: 0.9rem;">The Netflix app on your TV will automatically sign in within seconds</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="tv-auth-container">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon"><i class="fas fa-tv"></i></div>
+          <div class="card-title">TV Login via Token Link</div>
         </div>
-    `;
+
+        <div class="tv-auth-info" style="margin-bottom: var(--space-lg); padding: var(--space-md); background: rgba(0,212,255,0.05); border-radius: var(--radius-md); border-left: 3px solid var(--accent-cyan);">
+          <i class="fas fa-info-circle" style="color: var(--accent-cyan); margin-right: 8px;"></i>
+          <span style="color: var(--text-secondary); font-size: 0.9rem;">
+            This method generates a direct Netflix login link. Open it on your phone/PC (not the TV) while your TV shows the sign-in code.
+          </span>
+        </div>
+
+        <div class="tv-auth-options" style="margin-bottom: var(--space-lg);">
+          <div class="input-group">
+            <label><i class="fas fa-cookie"></i> NetflixId (Optional - uses stored account if empty)</label>
+            <input type="text" id="tv-auth-netflix-id" placeholder="Leave empty to use your stored account" 
+              style="width: 100%; padding: 14px 18px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-md); color: var(--text-primary); font-size: 1rem;">
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-glow" id="tv-auth-generate-btn" onclick="generateTVLoginLink()" style="width: 100%; padding: 16px;">
+          <i class="fas fa-magic"></i>
+          <span>Generate TV Login Link</span>
+        </button>
+
+        <div id="tv-auth-result" style="margin-top: var(--space-lg);"></div>
+
+        <div class="tv-auth-steps" style="margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid rgba(255,255,255,0.05);">
+          <h4 style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">
+            <i class="fas fa-list-ol"></i> How it works
+          </h4>
+          <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">1</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Open Netflix on your TV</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Launch Netflix and go to Sign In → Sign in with Web</span>
+            </div>
+          </div>
+          <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">2</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Click Generate Link</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Click the button above to generate a login token</span>
+            </div>
+          </div>
+          <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); margin-bottom: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">3</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Open the TV link on your phone</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Click the TV link, Netflix will open and auto-link your TV</span>
+            </div>
+          </div>
+          <div class="step" style="display: flex; align-items: flex-start; gap: var(--space-md); padding: var(--space-md); background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <span class="step-num" style="width: 32px; height: 32px; background: var(--gradient-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;">4</span>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Done!</strong>
+              <span style="color: var(--text-muted); font-size: 0.9rem;">Your TV will automatically sign in within seconds</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 
   appContent.appendChild(tvAuthContent);
+}
 
-  // Initialize TV code input handlers
-  initTVCodeInputs();
+async function generateTVLoginLink() {
+  const btn = document.getElementById("tv-auth-generate-btn");
+  const resultDiv = document.getElementById("tv-auth-result");
+  const netflixIdInput = document.getElementById("tv-auth-netflix-id");
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Generating...</span>';
+  resultDiv.innerHTML = "";
+
+  try {
+    const body = {};
+    const customNetflixId = netflixIdInput.value.trim();
+    if (customNetflixId) {
+      body.netflix_id = customNetflixId;
+    }
+
+    const response = await fetch(`${API_URL}/api/tv-login-link`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      const result = data.data;
+      const expTime = result.expires 
+        ? new Date(result.expires * 1000).toLocaleString() 
+        : "Unknown";
+
+      resultDiv.innerHTML = `
+        <div style="padding: var(--space-lg); background: rgba(6,255,165,0.05); border: 1px solid rgba(6,255,165,0.2); border-radius: var(--radius-lg);">
+          <div style="text-align: center; margin-bottom: var(--space-lg);">
+            <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-green);">
+              <i class="fas fa-check"></i>
+            </div>
+            <h3 style="color: var(--accent-green); margin-bottom: var(--space-sm);">Token Generated!</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Expires: ${expTime}</p>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.3); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
+            <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">
+              <i class="fas fa-key"></i> Token
+            </div>
+            <code style="color: var(--accent-cyan); font-size: 0.85rem; word-break: break-all;">${result.token}</code>
+          </div>
+
+          <div style="display: grid; gap: var(--space-md);">
+            <div style="padding: var(--space-md); background: rgba(0,212,255,0.05); border: 1px solid rgba(0,212,255,0.2); border-radius: var(--radius-md);">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-sm);">
+                <i class="fas fa-tv" style="color: var(--accent-cyan);"></i>
+                <strong style="color: var(--text-primary);">TV Link (Open on Phone!)</strong>
+              </div>
+              <a href="${result.login_urls.tv}" target="_blank" class="device-link" style="display: block; margin-bottom: var(--space-sm);">
+                <i class="fas fa-external-link-alt"></i> Open Netflix TV Login
+              </a>
+              <button class="btn-copy" onclick="copyToClipboard('${result.login_urls.tv}', 'TV link copied!')" style="width: 100%;">
+                <i class="fas fa-copy"></i> Copy TV Link
+              </button>
+            </div>
+
+            <div style="padding: var(--space-md); background: rgba(157,78,221,0.05); border: 1px solid rgba(157,78,221,0.2); border-radius: var(--radius-md);">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: var(--space-sm);">
+                <i class="fas fa-mobile-alt" style="color: var(--accent-purple);"></i>
+                <strong style="color: var(--text-primary);">Phone Link</strong>
+              </div>
+              <a href="${result.login_urls.phone}" target="_blank" class="device-link" style="display: block; margin-bottom: var(--space-sm);">
+                <i class="fas fa-external-link-alt"></i> Open on Phone
+              </a>
+              <button class="btn-copy" onclick="copyToClipboard('${result.login_urls.phone}', 'Phone link copied!')" style="width: 100%;">
+                <i class="fas fa-copy"></i> Copy Phone Link
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-top: var(--space-lg); padding: var(--space-md); background: rgba(255,159,28,0.05); border: 1px solid rgba(255,159,28,0.2); border-radius: var(--radius-md);">
+            <strong style="color: var(--accent-orange); display: block; margin-bottom: var(--space-sm);">
+              <i class="fas fa-exclamation-triangle"></i> Important
+            </strong>
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; padding-left: 20px; margin: 0;">
+              ${result.instructions.map(i => `<li style="margin-bottom: 4px;">${i}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `;
+      showNotification("TV login link generated successfully!");
+    } else {
+      resultDiv.innerHTML = `
+        <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center;">
+          <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-md); font-size: 1.5rem; color: var(--accent-red);">
+            <i class="fas fa-times"></i>
+          </div>
+          <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Generation Failed</h3>
+          <p style="color: var(--text-secondary);">${data.message}</p>
+        </div>
+      `;
+      showNotification(data.message, true);
+    }
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div style="padding: var(--space-lg); background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); text-align: center;">
+        <h3 style="color: var(--accent-red); margin-bottom: var(--space-sm);">Network Error</h3>
+        <p style="color: var(--text-secondary);">Failed to connect to server.</p>
+      </div>
+    `;
+    showNotification("Network error", true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-magic"></i><span>Generate TV Login Link</span>';
+  }
 }
 
 function initTVCodeInputs() {
