@@ -2694,7 +2694,6 @@ async function generateTVLoginLink() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-magic"></i><span>Generate TV Login Link</span>';
-    initTVCodeInputs();
   }
 }
 
