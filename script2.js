@@ -182,7 +182,6 @@ async function handleAuth(e) {
 async function checkSession() {
   const token = localStorage.getItem("access_token");
 
-  // No token - force show login
   if (!token) {
     forceShowLogin();
     return;
@@ -201,10 +200,10 @@ async function checkSession() {
       accessToken = token;
       currentUser = data.user;
       isPremium = data.user.is_premium;
+      isSuperAdmin = data.user.is_super_admin || data.user.role === "super_admin";
       document.body.classList.add("logged-in");
       updateUIForUser();
     } else {
-      // Invalid token - force login
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       forceShowLogin();
