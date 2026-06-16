@@ -2486,3 +2486,58 @@ body.logged-in .login-prompt {
   0% { width: 0; }
   100% { width: 100%; }
 }
+
+.tv-auth-container {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.tv-code-digit:focus {
+    outline: none;
+    border-color: var(--accent-cyan) !important;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3) !important;
+    transform: scale(1.05);
+}
+
+.tv-code-digit.filled {
+    border-color: var(--accent-green) !important;
+    color: var(--accent-green) !important;
+}
+
+/* Animation for result cards */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#tv-auth-result > div {
+    animation: slideInUp 0.4s ease;
+}
+
+/* Responsive TV code inputs */
+@media (max-width: 480px) {
+    .tv-code-inputs {
+        gap: 6px !important;
+    }
+
+    .tv-code-digit {
+        width: 38px !important;
+        height: 48px !important;
+        font-size: 1.2rem !important;
+    }
+}
+
+/* TV Auth tab styling */
+#tv-auth-tab i {
+    color: var(--accent-cyan);
+}
+
+#tv-auth-tab.active i {
+    color: var(--text-primary);
+}
