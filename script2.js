@@ -2786,6 +2786,25 @@ function initTVCodeInputs() {
   });
 }
 
+function getTVCode() {
+  const inputs = document.querySelectorAll(".tv-code-digit");
+  let code = "";
+  inputs.forEach((input) => {
+    code += input.value;
+  });
+  return code;
+}
+
+function checkTVCodeComplete() {
+  const inputs = document.querySelectorAll(".tv-code-digit");
+  const code = Array.from(inputs).map(i => i.value).join("");
+  // Optional: auto-enable/disable submit or add visual feedback
+  const allFilled = code.length === 8 && /^\d{8}$/.test(code);
+  const btn = document.getElementById("tv-auth-submit-btn");
+  if (btn) {
+    btn.style.opacity = allFilled ? "1" : "0.7";
+  }
+}
 
 async function submitTVCode() {
   const code = getTVCode();
