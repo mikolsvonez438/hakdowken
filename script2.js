@@ -2783,25 +2783,27 @@ async function submitTVCode() {
 
     const data = await response.json();
 
-    if (data.status === "success") {
-      resultDiv.innerHTML = `
+    if (data.status === "success") {if (data.status === "success") {
+    resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(6,255,165,0.1); border: 1px solid var(--accent-green); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
-          <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-green);">
-            <i class="fas fa-check"></i>
-          </div>
-          <h3 style="color: var(--accent-green); margin-bottom: 10px;">TV Linked Successfully!</h3>
-          <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">Check your TV - it should be signed in now.</p>
+            <div style="width: 60px; height: 60px; background: rgba(6,255,165,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-green);">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 style="color: var(--accent-green); margin-bottom: 10px;">TV Linked Successfully!</h3>
+            <p style="color: var(--text-secondary); font-size: 0.95rem;">${data.message}</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">
+                <i class="fas fa-tv"></i> Check your TV - it should show your profile selection screen within 30 seconds.
+            </p>
         </div>
-      `;
-      showNotification("TV device linked successfully!");
-
-      // Clear inputs
-      document.querySelectorAll(".tv-code-digit").forEach((inp) => {
+    `;
+    showNotification("TV device linked successfully!");
+    
+    // Clear code inputs
+    document.querySelectorAll(".tv-code-digit").forEach(inp => {
         inp.value = "";
         inp.style.borderColor = "rgba(255,255,255,0.1)";
-      });
-    } else {
+    });
+} else {
       resultDiv.innerHTML = `
         <div style="padding: 25px; background: rgba(230,57,70,0.1); border: 1px solid var(--accent-red); border-radius: 12px; text-align: center; animation: slideIn 0.3s ease;">
           <div style="width: 60px; height: 60px; background: rgba(230,57,70,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 1.5rem; color: var(--accent-red);">
